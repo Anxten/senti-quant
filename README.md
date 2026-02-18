@@ -1,5 +1,5 @@
 ---
-title: Senti-Quant: AI Truth Engine
+title: "Senti-Quant: AI Truth Engine"
 emoji: 🛡️
 colorFrom: indigo
 colorTo: purple
