@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from src.data.models import Article, NewsSource
+from src.data.models import Article, NewsSource, SentimentLog
 from src.data.scraper import ScrapedData
 import logging
 
@@ -57,3 +57,42 @@ def save_article(db: Session, data: ScrapedData) -> bool:
         db.rollback()
         logger.error(f"❌ Database Error: {e}")
         return False
+
+
+def save_sentiment_log(db: Session, article_id: int, analysis_result: dict) -> bool:
+    """
+    Menyimpan hasil analisis AI ke tabel sentiment_logs.
+    """
+    try:
+        # Cek apakah artikel ini sudah pernah dianalisis
+        existing_log = db.query(SentimentLog).filter(SentimentLog.article_id == article_id).first()
+        if existing_log:
+            logger.info(f"♻️ Sentimen untuk artikel ID {article_id} sudah ada. Skip.")
+            return False
+
+        new_log = SentimentLog(
+            article_id=article_id,
+            sentiment_score=analysis_result.get("integrity_score", 0.0),
+            sentiment_label=analysis_result.get("sentiment_label", "NEUTRAL"),
+            confidence=analysis_result.get("confidence", 0.0),
+            integrity_score=analysis_result.get("integrity_score", 0.0)
+        )
+        
+        db.add(new_log)
+        db.commit()
+        logger.info(f"🧠 Sentimen Tersimpan -> Label: {new_log.sentiment_label} | Integritas: {new_log.integrity_score:.2f}")
+        return True
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Gagal menyimpan sentimen: {e}")
+        return False
+
+def get_unprocessed_articles(db: Session, limit: int = 10):
+    """
+    Mengambil artikel yang belum memiliki data di tabel sentiment_logs.
+    """
+    # Mencari artikel yang ID-nya TIDAK ADA di tabel sentiment_logs
+    subquery = db.query(SentimentLog.article_id)
+    articles = db.query(Article).filter(Article.id.notin_(subquery)).limit(limit).all()
+    return articles
