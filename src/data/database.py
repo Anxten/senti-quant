@@ -24,3 +24,11 @@ def init_db():
     print(f"Connecting to database at {DB_HOST}...")
     Base.metadata.create_all(bind=engine)
     print("✅ Success! Tables created successfully.")
+
+def get_db():
+    """Generator untuk dependency injection (buka-tutup session otomatis)"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
