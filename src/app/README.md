@@ -4,12 +4,22 @@ Web-based visualization dashboard untuk Truth Engine.
 
 ## 🚀 Quick Start
 
+### Opsi 1: Menggunakan Launcher Script (Recommended)
 ```bash
-# Jalankan dashboard
-streamlit run src/app/dashboard.py
+# Dari root project
+./run_dashboard.sh
+```
+
+### Opsi 2: Manual Command
+```bash
+# Dari root project
+PYTHONPATH=$(pwd) streamlit run src/app/dashboard.py
 ```
 
 Dashboard akan terbuka di browser pada `http://localhost:8501`
+
+### ⚠️ Important Note
+Jangan jalankan `streamlit run src/app/dashboard.py` langsung tanpa set PYTHONPATH, karena akan error import.
 
 ## 📊 Features
 

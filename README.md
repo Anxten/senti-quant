@@ -15,14 +15,20 @@ license: mit
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
 ![AI](https://img.shields.io/badge/AI-Transformers%20%7C%20NLP-orange.svg)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)
-![Status](https://img.shields.io/badge/Status-In%20Development-yellow.svg)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)
 
 **Senti-Quant** is a next-generation financial analysis platform that bridges **Natural Language Processing (NLP)** with **Quantitative Analysis**. Unlike traditional tools that just read sentiment, Senti-Quant acts as a "Truth Engine" to filter out market noise, bot activities, and information pollution.
 
 > *"In 2026, the problem isn't lack of information. It's Information Asymmetry and Data Pollution."*
 
 ## 🔗 Live Demo
-*Coming Soon* — The project is currently in the architectural phase, focusing on building a robust Data Integrity Layer.
+✅ **Fully Functional** — Run locally with the commands above to see the Truth Engine in action!
+
+**Features:**
+- Real-time sentiment analysis with Indonesia-BERT
+- Interactive dashboard with Plotly visualizations
+- Noise detection and integrity scoring
+- PostgreSQL data persistence
 
 ## 🚀 Key Features (The "Truth Engine")
 * **Sentiment De-noising:** Automatically filters out social media bots, spam, and "pump-and-dump" attempts before calculating sentiment scores.
@@ -48,11 +54,30 @@ $$
 Logic + Creativity = Innovation
 $$
 
+## 🚀 Quick Start
+
+### 1. Run Data Pipeline
+```bash
+# Scrape news, analyze sentiment, save to database
+python -m src.main
+```
+
+### 2. Launch Dashboard
+```bash
+# Option 1: Using launcher script (recommended)
+./run_dashboard.sh
+
+# Option 2: Manual command
+PYTHONPATH=$(pwd) streamlit run src/app/dashboard.py
+```
+
+Dashboard will open at `http://localhost:8501`
+
 ## 🛠️ Tech Stack
 - **Core:** Python 3.10+, Asyncio
-- **Data Layer:** PostgreSQL (Relational), BeautifulSoup/Playwright (Scraping)
-- **AI Engine:** Hugging Face Transformers (RoBERTa / FinBERT)
-- **Analysis:** Scikit-learn (K-Means Clustering for Outlier Detection)
+- **Data Layer:** PostgreSQL, SQLAlchemy ORM, BeautifulSoup, aiohttp
+- **AI Engine:** Hugging Face Transformers (Indonesia-BERT)
+- **Visualization:** Streamlit, Plotly
 - **Environment:** Fedora Linux | VS Code
 
 ## 📦 Installation & Setup
@@ -95,13 +120,15 @@ senti-quant/
 ├── src/
 │   ├── data/           # Database models & Async scrapers
 │   ├── analysis/       # AI Models & Sentiment Logic
-│   ├── utils/          # Helper functions & Loggers
+│   ├── app/            # Streamlit Dashboard
+│   ├── main.py         # ETL Pipeline Orchestrator
 │   └── __init__.py
-├── notebooks/          # Jupyter Notebooks for experimentation
-├── tests/              # Unit & Integration tests
-├── config/             # Configuration files (.env, settings)
-├── requirements.txt    # Project dependencies
-└── README.md           # Documentation
+├── test_db_connection.py  # Database tests
+├── test_sentiment.py      # AI tests
+├── run_dashboard.sh       # Dashboard launcher
+├── requirements.txt       # Project dependencies
+├── .env                   # Configuration
+└── README.md              # Documentation
 ```
 
 ## 🎯 Use Cases
