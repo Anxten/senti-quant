@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from src.data.models import Article, NewsSource, SentimentLog
 from src.data.scraper import ScrapedData
+from src.config.credibility import get_credibility
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,12 +10,21 @@ logger = logging.getLogger(__name__)
 def get_or_create_source(db: Session, domain: str) -> NewsSource:
     """
     Cek apakah sumber berita (misal: cnbc.com) sudah ada.
-    Jika belum, buat baru. Jika sudah, kembalikan ID-nya.
+    Jika belum, buat baru dengan credibility score dari config.
+    Jika sudah, kembalikan ID-nya.
     """
     source = db.query(NewsSource).filter(NewsSource.domain == domain).first()
     if not source:
-        logger.info(f"🆕 Sumber baru terdeteksi: {domain}")
-        source = NewsSource(domain=domain, name=domain, is_trusted=False)
+        # Ambil credibility dari config
+        credibility = get_credibility(domain)
+        
+        logger.info(f"🆕 Sumber baru terdeteksi: {domain} (Credibility: {credibility:.2f})")
+        source = NewsSource(
+            domain=domain, 
+            name=domain, 
+            credibility_score=credibility,
+            is_trusted=(credibility >= 0.75)
+        )
         db.add(source)
         db.commit()
         db.refresh(source)
