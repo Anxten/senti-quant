@@ -66,8 +66,11 @@ async def run_pipeline():
             for article in unprocessed_articles:
                 logger.info(f"Menganalisis: {article.title[:40]}...")
                 
-                # Eksekusi AI
-                analysis_result = ai_engine.analyze(article.content)
+                # Ambil credibility score dari sumber artikel
+                source_credibility = article.source.credibility_score
+                
+                # Eksekusi AI dengan credibility score
+                analysis_result = ai_engine.analyze(article.content, source_credibility)
                 
                 # Simpan ke Database
                 save_sentiment_log(db, article.id, analysis_result)

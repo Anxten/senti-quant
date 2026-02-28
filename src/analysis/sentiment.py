@@ -60,9 +60,16 @@ class TruthEngineAI:
         # Batasi maksimal 1.0 (100%)
         return min(noise_score, 1.0)
 
-    def analyze(self, text: str) -> dict:
+    def analyze(self, text: str, source_credibility: float = 0.5) -> dict:
         """
         Menganalisis teks dan mengembalikan Sentiment + Integrity Score.
+        
+        Args:
+            text: Konten artikel yang akan dianalisis
+            source_credibility: Kredibilitas sumber (0.0 - 1.0), default 0.5
+        
+        Returns:
+            Dict dengan sentiment_label, confidence, integrity_score, dll
         """
         # Truncate teks ke 512 karakter pertama (batasan token BERT) agar cepat dan tidak crash
         safe_text = text[:512]
@@ -94,13 +101,17 @@ class TruthEngineAI:
         scalar_map = {"NEGATIVE": -1, "NEUTRAL": 0, "POSITIVE": 1}
         s_value = scalar_map.get(std_label, 0)
         
-        # Rumus Integritas (S_i * (1 - N_i)) - Mengurangi bobot sentimen jika noise tinggi
-        integrity_score = s_value * (1.0 - noise_prob)
+        # 3. Rumus Truth Engine Lengkap: Si × Ci × (1 - Ni)
+        # Si = Sentiment Score
+        # Ci = Source Credibility
+        # Ni = Noise Probability
+        integrity_score = s_value * source_credibility * (1.0 - noise_prob)
 
         return {
             "sentiment_label": std_label,
             "confidence": confidence,
             "noise_probability": noise_prob,
+            "source_credibility": source_credibility,
             "integrity_score": integrity_score
         }
     

@@ -41,6 +41,8 @@ class SentimentLog(Base):
     sentiment_score: Mapped[float] = mapped_column(Float)
     sentiment_label: Mapped[str] = mapped_column(String(20))
     confidence: Mapped[float] = mapped_column(Float)
+    source_credibility: Mapped[float] = mapped_column(Float, default=0.5)
+    noise_probability: Mapped[float] = mapped_column(Float, default=0.0)
     integrity_score: Mapped[float] = mapped_column(Float, default=0.0)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

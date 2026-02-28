@@ -75,6 +75,8 @@ def save_sentiment_log(db: Session, article_id: int, analysis_result: dict) -> b
             sentiment_score=analysis_result.get("integrity_score", 0.0),
             sentiment_label=analysis_result.get("sentiment_label", "NEUTRAL"),
             confidence=analysis_result.get("confidence", 0.0),
+            source_credibility=analysis_result.get("source_credibility", 0.5),
+            noise_probability=analysis_result.get("noise_probability", 0.0),
             integrity_score=analysis_result.get("integrity_score", 0.0)
         )
         
