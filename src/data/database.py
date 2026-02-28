@@ -6,27 +6,22 @@ from src.data.models import Base
 
 load_dotenv()
 
-# Ambil config dari .env
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-DB_NAME = os.getenv("DB_NAME")
-
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# Ambil langsung URL utuh dari .env
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Setup Engine
-engine = create_engine(DATABASE_URL)
+# echo=False agar terminal tidak terlalu penuh dengan log SQL
+engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """Fungsi sakti untuk membuat semua tabel"""
-    print(f"Connecting to database at {DB_HOST}...")
+    print("Connecting to Cloud Database...")
     Base.metadata.create_all(bind=engine)
-    print("✅ Success! Tables created successfully.")
+    print("✅ Success! Tables created in the Cloud successfully.")
 
 def get_db():
-    """Generator untuk dependency injection (buka-tutup session otomatis)"""
+    """Dependency untuk mengambil session database."""
     db = SessionLocal()
     try:
         yield db
