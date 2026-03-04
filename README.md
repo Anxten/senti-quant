@@ -22,7 +22,10 @@ license: mit
 > *"In 2026, the problem isn't lack of information. It's Information Asymmetry and Data Pollution."*
 
 ## 🔗 Live Demo
-✅ **Fully Functional** — Run locally with the commands above to see the Truth Engine in action!
+
+**🚀 Aplikasi Senti-Quant sudah Live!** Kamu bisa mengakses dashboard interaktifnya di sini:  
+👉 **[allan-senti-quant.streamlit.app](https://allan-senti-quant.streamlit.app/)**
+
 
 **Features:**
 - Real-time sentiment analysis with Indonesia-BERT
