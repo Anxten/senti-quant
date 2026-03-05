@@ -107,6 +107,48 @@ class AsyncNewsScraper:
             return self.parse_html(html, url)
         return None
 
+
+# --- FUNGSI RSS PARSER -------------------------------------------------------
+async def fetch_rss_links(rss_urls: list) -> list:
+    """
+    Menyedot ratusan link artikel terbaru secara legal dari RSS Feed.
+    """
+    all_links = []
+    
+    # Kita pakai session khusus untuk RSS
+    async with aiohttp.ClientSession() as session:
+        for url in rss_urls:
+            try:
+                print(f"📡 Mengambil RSS Feed dari: {url}...")
+                # Timeout 15 detik agar tidak menggantung
+                async with session.get(url, timeout=15) as response:
+                    if response.status == 200:
+                        xml_data = await response.text()
+                        
+                        # Menggunakan fitur bawaan BeautifulSoup untuk membedah XML
+                        # (Pastikan library 'lxml' sudah terinstall, atau gunakan 'html.parser')
+                        soup = BeautifulSoup(xml_data, "html.parser") 
+                        
+                        # Di RSS, setiap berita dibungkus dalam tag <item>
+                        items = soup.find_all("item")
+                        
+                        count = 0
+                        for item in items:
+                            link = item.find("link")
+                            if link and link.text:
+                                all_links.append(link.text.strip())
+                                count += 1
+                                
+                        print(f"✅ Berhasil mendapatkan {count} link dari {url}")
+                    else:
+                        print(f"❌ Gagal akses {url} (Status: {response.status})")
+            except Exception as e:
+                print(f"⚠️ Error saat membaca RSS {url}: {e}")
+                
+    # Menghapus duplikat (kalau ada link yang sama)
+    return list(set(all_links))
+
+
 # --- BAGIAN TESTING (Hanya jalan jika file ini dieksekusi langsung) ---
 async def test_run():
     # Contoh target: Salah satu berita saham (Kita pakai URL real untuk tes)

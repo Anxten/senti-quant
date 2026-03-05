@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from src.data.database import init_db, get_db
-from src.data.scraper import AsyncNewsScraper
+from src.data.scraper import AsyncNewsScraper, fetch_rss_links
 from src.data.crud import save_article, get_unprocessed_articles, save_sentiment_log
 from src.analysis.sentiment import TruthEngineAI
 
@@ -25,13 +25,23 @@ async def run_pipeline():
     # 1. Inisialisasi Database (Aman dieksekusi berkali-kali)
     init_db()
     
-    # Target URL (Kita pakai 2 berita CNBC Indonesia untuk testing)
-    target_urls = [
-        "https://www.cnbcindonesia.com/market/20230829141022-17-467053/bursa-asia-hijau-ihsg-malah-galau",
-        "https://www.cnbcindonesia.com/investment/20230830103000-21-467321/waspada-penipuan-berkedok-investasi-saham",
+    # 2. Daftar "Mata Air" Berita Finansial (RSS Feeds)
+    rss_sources = [
+        "https://www.cnbcindonesia.com/market/rss",
+        "https://www.cnbcindonesia.com/investment/rss",
+        # Kamu bisa tambah RSS Kontan, Bisnis.com, dll di sini nanti
     ]
     
-    # 2. Extract (Scraping)
+    # 3. Sedot semua link terbaru (Bisa dapat 50 - 100 link dalam 2 detik)
+    target_urls = await fetch_rss_links(rss_sources)
+    logger.info(f"🎯 Total target artikel hari ini: {len(target_urls)} artikel.")
+    
+    # --- BATASAN AMAN (SEMENTARA) ---
+    # Karena kita belum mengatur "napas" AI dan server, kita potong dulu jadi 10 
+    # agar laptop dan databasemu tidak kaget. Nanti bisa kita hapus batasannya.
+    target_urls = target_urls[:10]
+    
+    # 4. Extract (Scraping)
     scraped_results = []
     async with AsyncNewsScraper() as scraper:
         tasks = [scraper.scrape_url(url) for url in target_urls]
