@@ -22,70 +22,65 @@ class ScrapedData:
 
 class AsyncNewsScraper:
     """
-    Engine scraping asinkronus (Non-blocking).
-    Mampu mengambil ratusan halaman dalam waktu singkat.
+    Engine scraping asinkronus (Non-blocking) dengan Rate Limiting.
     """
     
-    def __init__(self):
+    def __init__(self, max_concurrent_requests: int = 5):
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         }
         self.session: Optional[aiohttp.ClientSession] = None
+        # INI LAMPUNYA: Hanya izinkan maksimal 5 request jalan bersamaan
+        self.semaphore = asyncio.Semaphore(max_concurrent_requests)
 
     async def __aenter__(self):
-        """Context Manager entry (biar bisa pakai 'with')"""
+        """Context Manager entry"""
         self.session = aiohttp.ClientSession(headers=self.headers)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Context Manager exit (otomatis tutup koneksi)"""
+        """Context Manager exit"""
         if self.session:
             await self.session.close()
 
     async def fetch_html(self, url: str) -> Optional[str]:
-        """Mengambil raw HTML dari URL secara async."""
+        """Mengambil raw HTML dari URL secara async dengan pengaman."""
         try:
             if not self.session:
                 raise RuntimeError("Session belum diinisialisasi. Gunakan 'async with'.")
 
-            async with self.session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    return await response.text()
-                else:
-                    logger.warning(f"Gagal fetch {url}: Status {response.status}")
-                    return None
+            # Minta izin ke lampu lalu lintas sebelum mengeksekusi request network
+            async with self.semaphore:
+                await asyncio.sleep(1) # Jeda sopan santun ke server (1 detik)
+                
+                async with self.session.get(url, timeout=10) as response:
+                    if response.status == 200:
+                        return await response.text()
+                    else:
+                        logger.warning(f"Gagal fetch {url}: Status {response.status}")
+                        return None
         except Exception as e:
             logger.error(f"Error koneksi ke {url}: {e}")
             return None
 
     def parse_html(self, html: str, url: str) -> Optional[ScrapedData]:
-        """
-        Logika ekstraksi data menggunakan BeautifulSoup.
-        (CPU Bound operation)
-        """
+        """Logika ekstraksi data menggunakan BeautifulSoup."""
         try:
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, 'lxml') # Untuk HTML web biasa, 'lxml' sudah benar
             
-            # --- LOGIKA DETEKSI GENERIC (Bisa disesuaikan per situs) ---
-            
-            # 1. Coba cari Judul (h1)
             title_tag = soup.find('h1')
             if not title_tag:
                 return None
             title = title_tag.get_text(strip=True)
 
-            # 2. Coba cari Konten (biasanya di tag <p>)
-            # Kita ambil semua <p> yang teksnya panjang (> 50 karakter)
             paragraphs = soup.find_all('p')
             content_text = " ".join([p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 50])
             
-            # Jika konten terlalu pendek, kemungkinan gagal parsing
             if len(content_text) < 200:
                 logger.warning(f"Konten terlalu pendek untuk {url}, mungkin terblokir atau salah parsing.")
                 return None
 
-            # 3. Ambil domain
             domain = url.split("//")[-1].split("/")[0]
 
             return ScrapedData(
@@ -93,7 +88,7 @@ class AsyncNewsScraper:
                 title=title,
                 content=content_text,
                 source_domain=domain,
-                published_at=datetime.now().isoformat() # Placeholder, nanti kita parsing tanggal asli
+                published_at=datetime.now().isoformat()
             )
 
         except Exception as e:
@@ -107,29 +102,22 @@ class AsyncNewsScraper:
             return self.parse_html(html, url)
         return None
 
-
 # --- FUNGSI RSS PARSER -------------------------------------------------------
 async def fetch_rss_links(rss_urls: list) -> list:
-    """
-    Menyedot ratusan link artikel terbaru secara legal dari RSS Feed.
-    """
+    """Menyedot ratusan link artikel terbaru secara legal dari RSS Feed."""
     all_links = []
     
-    # Kita pakai session khusus untuk RSS
     async with aiohttp.ClientSession() as session:
         for url in rss_urls:
             try:
                 print(f"📡 Mengambil RSS Feed dari: {url}...")
-                # Timeout 15 detik agar tidak menggantung
                 async with session.get(url, timeout=15) as response:
                     if response.status == 200:
                         xml_data = await response.text()
                         
-                        # Menggunakan fitur bawaan BeautifulSoup untuk membedah XML
-                        # (Pastikan library 'lxml' sudah terinstall, atau gunakan 'html.parser')
-                        soup = BeautifulSoup(xml_data, "html.parser") 
+                        # PERBAIKAN: Gunakan "xml" murni untuk menghindari tag terpotong
+                        soup = BeautifulSoup(xml_data, "xml") 
                         
-                        # Di RSS, setiap berita dibungkus dalam tag <item>
                         items = soup.find_all("item")
                         
                         count = 0
@@ -145,7 +133,6 @@ async def fetch_rss_links(rss_urls: list) -> list:
             except Exception as e:
                 print(f"⚠️ Error saat membaca RSS {url}: {e}")
                 
-    # Menghapus duplikat (kalau ada link yang sama)
     return list(set(all_links))
 
 
