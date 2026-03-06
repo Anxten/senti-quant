@@ -36,11 +36,6 @@ async def run_pipeline():
     target_urls = await fetch_rss_links(rss_sources)
     logger.info(f"🎯 Total target artikel hari ini: {len(target_urls)} artikel.")
     
-    # --- BATASAN AMAN (SEMENTARA) ---
-    # Karena kita belum mengatur "napas" AI dan server, kita potong dulu jadi 10 
-    # agar laptop dan databasemu tidak kaget. Nanti bisa kita hapus batasannya.
-    target_urls = target_urls[:10]
-    
     # 4. Extract (Scraping)
     scraped_results = []
     async with AsyncNewsScraper() as scraper:
@@ -64,7 +59,7 @@ async def run_pipeline():
         # --- FASE 2: AI SENTIMENT ANALYSIS ---
         logger.info("🔍 Memulai Fase AI: Analisis Sentimen (Truth Engine)...")
         
-        unprocessed_articles = get_unprocessed_articles(db, limit=5)
+        unprocessed_articles = get_unprocessed_articles(db, limit=100)
         
         if not unprocessed_articles:
             logger.info("✅ Semua artikel sudah dianalisis. Tidak ada antrian baru.")
