@@ -11,134 +11,123 @@ from sqlalchemy.orm import Session
 from src.data.database import SessionLocal
 from src.data.models import Article, SentimentLog, NewsSource
 
-# --- KONFIGURASI HALAMAN ---
+# --- 1. KONFIGURASI HALAMAN (Wajib Paling Atas) ---
 st.set_page_config(
-    page_title="Senti-Quant | Truth Engine",
+    page_title="Senti-Quant | The Truth Engine",
     page_icon="🛡️",
-    layout="wide",
+    layout="wide", # Bikin lebar ala dashboard profesional
     initial_sidebar_state="expanded"
 )
 
-# --- FUNGSI PENGAMBILAN DATA ---
-@st.cache_data(ttl=60)  # Cache data selama 60 detik agar DB tidak jebol
-def load_data():
-    db: Session = SessionLocal()
-    try:
-        # Join tabel Articles, SentimentLogs, dan NewsSources
-        query = db.query(
-            Article.title,
-            Article.url,
-            NewsSource.domain,
-            SentimentLog.sentiment_label,
-            SentimentLog.confidence,
-            SentimentLog.integrity_score,
-            SentimentLog.analyzed_at
-        ).join(SentimentLog, Article.id == SentimentLog.article_id)\
-         .join(NewsSource, Article.source_id == NewsSource.id)
-        
-        # Eksekusi dan ubah ke Pandas DataFrame
-        results = query.all()
-        
-        # Jika kosong
-        if not results:
-            return pd.DataFrame()
-            
-        df = pd.DataFrame(results)
-        # Rename kolom agar lebih cantik
-        df.columns = ["Judul", "URL", "Sumber", "Sentimen", "Confidence", "Integrity_Score", "Waktu_Analisis"]
-        
-        # Hitung status kredibilitas berdasarkan Integrity Score
-        df['Status'] = df['Integrity_Score'].apply(lambda x: '✅ Valid' if x > 0 else '⚠️ Neutral/Noise')
-        
-        return df
-    finally:
-        db.close()
+# --- 2. KONEKSI DATABASE ---
+@st.cache_resource
+def get_db_session():
+    return SessionLocal()
 
-# --- HEADER APP ---
+db: Session = get_db_session()
+
+# --- 3. AMBIL DATA DARI NEON DB ---
+# Query menggabungkan Article, SentimentLog, dan NewsSource
+query = db.query(
+    Article.title, 
+    Article.url, 
+    SentimentLog.sentiment_label, 
+    SentimentLog.integrity_score,
+    NewsSource.domain
+).join(SentimentLog, Article.id == SentimentLog.article_id)\
+ .join(NewsSource, Article.source_id == NewsSource.id).statement
+
+# Masukkan ke Pandas DataFrame agar mudah diolah
+df = pd.read_sql(query, db.bind)
+
+# --- 4. SIDEBAR (Filter Interaktif) ---
+st.sidebar.image("https://img.icons8.com/color/96/000000/bullish.png", width=80)
+st.sidebar.title("⚙️ Control Panel")
+st.sidebar.markdown("Filter data sentimen pasar secara *real-time*.")
+
+# Filter Sumber Berita
+sumber_list = ["Semua"] + df['domain'].unique().tolist()
+sumber_pilihan = st.sidebar.selectbox("📰 Filter Sumber Berita:", sumber_list)
+
+if sumber_pilihan != "Semua":
+    df = df[df['domain'] == sumber_pilihan]
+
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Truth Engine V1.0**\n\nBerita dengan sentimen 'NEUTRAL' biasanya adalah berita faktual tanpa opini pasar.")
+
+# --- 5. HEADER DASHBOARD ---
 st.title("🛡️ Senti-Quant: AI Truth Engine")
 st.markdown("*Menyaring Kebisingan, Menemukan Kebenaran di Pasar Modal.*")
-st.divider()
+st.markdown("---")
 
-# --- LOAD DATA ---
-df = load_data()
+# --- 6. METRIK KPI (Key Performance Indicators) ---
+# Menghitung statistik
+total_berita = len(df)
+bullish_count = len(df[df['sentiment_label'] == 'POSITIVE'])
+bearish_count = len(df[df['sentiment_label'] == 'NEGATIVE'])
+noise_count = len(df[df['sentiment_label'] == 'NEUTRAL'])
 
-if df.empty:
-    st.warning("Belum ada data sentimen di database. Silakan jalankan scraper terlebih dahulu.")
-    st.code("python -m src.main", language="bash")
-else:
-    # --- METRIK UTAMA (TOP ROW) ---
-    col1, col2, col3, col4 = st.columns(4)
-    
-    total_berita = len(df)
-    berita_valid = len(df[df['Integrity_Score'] > 0])
-    berita_noise = total_berita - berita_valid
-    
-    # Hitung sentimen dominan (dari berita yang valid saja)
-    if berita_valid > 0:
-        sentimen_dominan = df[df['Integrity_Score'] > 0]['Sentimen'].mode()[0]
+# Menampilkan 4 Kolom Metrik
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("📊 Total Berita Diproses", total_berita)
+col2.metric("🚀 Sentimen Bullish (Positif)", bullish_count)
+col3.metric("🩸 Sentimen Bearish (Negatif)", bearish_count)
+col4.metric("🌫️ Noise (Netral/Faktual)", noise_count)
+
+st.markdown("---")
+
+# --- 7. VISUALISASI GRAFIK INTERAKTIF ---
+col_chart1, col_chart2 = st.columns(2)
+
+with col_chart1:
+    st.subheader("🍩 Distribusi Sentimen Pasar")
+    if total_berita > 0:
+        # Membuat Donut Chart Interaktif dengan Plotly
+        fig_donut = px.pie(
+            df, 
+            names='sentiment_label', 
+            hole=0.4, # Membuatnya jadi donat
+            color='sentiment_label',
+            color_discrete_map={
+                'POSITIVE': '#00CC96', # Hijau
+                'NEGATIVE': '#EF553B', # Merah
+                'NEUTRAL': '#636EFA'   # Biru
+            }
+        )
+        fig_donut.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig_donut, use_container_width=True)
     else:
-        sentimen_dominan = "N/A"
+        st.warning("Belum ada data sentimen.")
 
-    col1.metric("Total Berita Diproses", total_berita)
-    col2.metric("Berita Organik (Valid)", berita_valid, help="Berita dengan Integrity Score > 0")
-    col3.metric("Berita Neutral/Noise", berita_noise, delta="-", delta_color="inverse")
-    col4.metric("Sentimen Pasar (Organik)", sentimen_dominan)
-
-    st.divider()
-
-    # --- BARIS KEDUA (GRAFIK) ---
-    col_chart1, col_chart2 = st.columns(2)
-
-    with col_chart1:
-        st.subheader("Distribusi Sentimen")
-        # Hitung jumlah per sentimen
-        sent_counts = df['Sentimen'].value_counts().reset_index()
-        sent_counts.columns = ['Sentimen', 'Jumlah']
-        
-        fig_bar = px.bar(
-            sent_counts, 
-            x='Sentimen', 
-            y='Jumlah', 
-            color='Sentimen',
-            color_discrete_map={"POSITIVE": "green", "NEGATIVE": "red", "NEUTRAL": "gray"}
+with col_chart2:
+    st.subheader("📈 Skor Integritas (Truth Score)")
+    if total_berita > 0:
+        # Histogram skor integritas
+        fig_hist = px.histogram(
+            df, 
+            x="integrity_score", 
+            nbins=10,
+            color_discrete_sequence=['#AB63FA']
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_hist, use_container_width=True)
+    else:
+        st.warning("Belum ada data integritas.")
 
-    with col_chart2:
-        st.subheader("Rasio Integritas Berita")
-        status_counts = df['Status'].value_counts().reset_index()
-        status_counts.columns = ['Status', 'Jumlah']
-        
-        fig_pie = px.pie(
-            status_counts, 
-            names='Status', 
-            values='Jumlah',
-            hole=0.4,
-            color='Status',
-            color_discrete_map={"✅ Valid": "#2ecc71", "⚠️ Neutral/Noise": "#e74c3c"}
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
+# --- 8. TABEL DATA LANGSUNG (Truth Feed) ---
+st.subheader("🔍 Live Truth Feed (Data Log)")
 
-    # --- TAMPILAN DATA TABEL (LIVE FEED) ---
-    st.subheader("🔍 Live Truth Feed (Data Log)")
-    
-    # Filter Interaktif
-    filter_sentimen = st.multiselect(
-        "Filter Sentimen:", 
-        options=["POSITIVE", "NEGATIVE", "NEUTRAL"], 
-        default=["POSITIVE", "NEGATIVE", "NEUTRAL"]
-    )
-    
-    # Terapkan filter
-    filtered_df = df[df['Sentimen'].isin(filter_sentimen)]
-    
-    # Tampilkan tabel yang sudah dipercantik
-    st.dataframe(
-        filtered_df[['Waktu_Analisis', 'Sumber', 'Judul', 'Sentimen', 'Confidence', 'Integrity_Score', 'Status']],
-        use_container_width=True,
-        hide_index=True
-    )
+# Merapikan tabel agar enak dilihat
+df_tabel = df[['title', 'domain', 'sentiment_label', 'integrity_score', 'url']]
+df_tabel.columns = ['Judul Artikel', 'Sumber', 'Sentimen', 'Skor Integritas', 'URL']
 
-    # --- FOOTER ---
-    st.divider()
-    st.caption("🛡️ Senti-Quant Truth Engine | Built with ❤️ by Allan Bendatu")
+# Tampilkan sebagai tabel interaktif di Streamlit
+st.dataframe(
+    df_tabel.style.applymap(
+        lambda x: 'color: green;' if x == 'POSITIVE' else ('color: red;' if x == 'NEGATIVE' else ''),
+        subset=['Sentimen']
+    ),
+    use_container_width=True,
+    height=300
+)
+
+st.caption("🛡️ Senti-Quant Truth Engine")
