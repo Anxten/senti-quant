@@ -60,6 +60,18 @@ class TruthEngineAI:
         # Kalau tidak ada kata kunci sakti, kembalikan None (Biar AI BERT yang mikir)
         return None
     
+    def _is_financial_news(self, text: str) -> bool:
+        """Memeriksa apakah artikel benar-benar membahas keuangan/saham."""
+        financial_keywords = [
+            'saham', 'ihsg', 'emiten', 'bursa', 'bei', 'investor', 
+            'dividen', 'laba', 'rugi bersih', 'kuartal', 'rupiah', 
+            'obligasi', 'reksa dana', 'sbn', 'suku bunga', 'inflasi', 
+            'akuisisi', 'ipo', 'sekuritas', 'trader'
+        ]
+        text_lower = text.lower()
+        match_count = sum(1 for word in financial_keywords if word in text_lower)
+        return match_count >= 2
+    
     def _calculate_noise_probability(self, text: str) -> float:
         """
         [Inovasi Senti-Quant] - De-noising Logic.
@@ -100,6 +112,16 @@ class TruthEngineAI:
         """
         # Truncate teks ke 512 karakter pertama (batasan token BERT) agar cepat dan tidak crash
         safe_text = text[:512]
+        
+        # 0. GATEKEEPER: Buang berita non-finansial
+        if not self._is_financial_news(safe_text):
+            return {
+                "sentiment_label": "IRRELEVANT",
+                "confidence": 0.0,
+                "noise_probability": 1.0,
+                "source_credibility": source_credibility,
+                "integrity_score": 0.0
+            }
         
         # 1. CEK KAMUS SAHAM TERLEBIH DAHULU (Bypass AI jika ketemu)
         heuristic_label = self._check_financial_dictionary(safe_text)
