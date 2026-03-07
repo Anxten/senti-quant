@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 class TruthEngineAI:
     """
     Core AI Module untuk Senti-Quant.
-    Menggabungkan Model Transformer (NLP) dengan Heuristic Logic (De-noising).
+    Menggabungkan Model Transformer (NLP) dengan Heuristic Logic (De-noising)
+    dan Kamus Finansial (Financial Dictionary).
     """
     
     def __init__(self):
@@ -32,6 +33,32 @@ class TruthEngineAI:
         except Exception as e:
             logger.error(f"❌ Gagal memuat model: {e}")
             raise e
+            
+        # --- KAMUS SAHAM (FINANCIAL HEURISTICS) ---
+        # Kata kunci yang memaksa AI untuk mengubah sentimen
+        self.positive_keywords = [
+            'bullish', 'meroket', 'cuan', 'laba naik', 'dividen', 
+            'rekor tertinggi', 'menguat tajam', 'akumulasi', 'terbang', 'rebound'
+        ]
+        self.negative_keywords = [
+            'bearish', 'anjlok', 'rugi', 'jeblok', 'suspend', 
+            'arb', 'koreksi tajam', 'melemah', 'bangkrut', 'gagal bayar', 'longsor'
+        ]
+
+    def _check_financial_dictionary(self, text: str) -> str:
+        """Mengecek apakah ada kata kunci saham yang sangat kuat di dalam teks."""
+        text_lower = text.lower()
+        
+        # Cek kata positif dulu
+        if any(word in text_lower for word in self.positive_keywords):
+            return "POSITIVE"
+            
+        # Cek kata negatif
+        if any(word in text_lower for word in self.negative_keywords):
+            return "NEGATIVE"
+            
+        # Kalau tidak ada kata kunci sakti, kembalikan None (Biar AI BERT yang mikir)
+        return None
     
     def _calculate_noise_probability(self, text: str) -> float:
         """
@@ -74,34 +101,41 @@ class TruthEngineAI:
         # Truncate teks ke 512 karakter pertama (batasan token BERT) agar cepat dan tidak crash
         safe_text = text[:512]
         
-        # 1. Dapatkan Sentimen dari AI
-        ai_result = self.nlp_pipeline(safe_text)[0]
+        # 1. CEK KAMUS SAHAM TERLEBIH DAHULU (Bypass AI jika ketemu)
+        heuristic_label = self._check_financial_dictionary(safe_text)
         
-        raw_label = ai_result['label']
-        confidence = ai_result['score']
-        
-        # Standarisasi Label (karena tiap model beda output nama labelnya)
-        label_map = {
-            "LABEL_0": "NEGATIVE",
-            "LABEL_1": "NEUTRAL",
-            "LABEL_2": "POSITIVE",
-            "negative": "NEGATIVE",
-            "neutral": "NEUTRAL",
-            "positive": "POSITIVE",
-            "label_0": "NEGATIVE",
-            "label_1": "NEUTRAL",
-            "label_2": "POSITIVE"
-        }
-        std_label = label_map.get(raw_label, raw_label.upper())
+        if heuristic_label:
+            std_label = heuristic_label
+            confidence = 0.95 # Anggap sangat yakin karena cocok dengan kamus
+            logger.info(f"💡 Heuristik Terdeteksi! Kata kunci memicu sentimen: {std_label}")
+        else:
+            # 2. JIKA TIDAK ADA DI KAMUS, BIARKAN AI BERT BEKERJA
+            ai_result = self.nlp_pipeline(safe_text)[0]
+            raw_label = ai_result['label']
+            confidence = ai_result['score']
+            
+            # Standarisasi Label (karena tiap model beda output nama labelnya)
+            label_map = {
+                "LABEL_0": "NEGATIVE",
+                "LABEL_1": "NEUTRAL",
+                "LABEL_2": "POSITIVE",
+                "negative": "NEGATIVE",
+                "neutral": "NEUTRAL",
+                "positive": "POSITIVE",
+                "label_0": "NEGATIVE",
+                "label_1": "NEUTRAL",
+                "label_2": "POSITIVE"
+            }
+            std_label = label_map.get(raw_label, raw_label.upper())
 
-        # 2. Hitung Truth Metrics (Inovasi kita)
+        # 3. Hitung Truth Metrics (Inovasi kita)
         noise_prob = self._calculate_noise_probability(safe_text)
         
         # Konversi sentimen ke skalar untuk perhitungan (-1, 0, 1)
         scalar_map = {"NEGATIVE": -1, "NEUTRAL": 0, "POSITIVE": 1}
         s_value = scalar_map.get(std_label, 0)
         
-        # 3. Rumus Truth Engine Lengkap: Si × Ci × (1 - Ni)
+        # 4. Rumus Truth Engine Lengkap: Si × Ci × (1 - Ni)
         # Si = Sentiment Score
         # Ci = Source Credibility
         # Ni = Noise Probability
@@ -114,5 +148,3 @@ class TruthEngineAI:
             "source_credibility": source_credibility,
             "integrity_score": integrity_score
         }
-    
-
