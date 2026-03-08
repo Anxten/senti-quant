@@ -28,6 +28,7 @@ db: Session = get_db_session()
 
 # --- 3. AMBIL DATA DARI NEON DB ---
 # Query menggabungkan Article, SentimentLog, dan NewsSource
+# Memfilter out label 'IRRELEVANT' agar tidak merusak metrik dashboard
 query = db.query(
     Article.title, 
     Article.url, 
@@ -35,7 +36,8 @@ query = db.query(
     SentimentLog.integrity_score,
     NewsSource.domain
 ).join(SentimentLog, Article.id == SentimentLog.article_id)\
- .join(NewsSource, Article.source_id == NewsSource.id).statement
+ .join(NewsSource, Article.source_id == NewsSource.id)\
+ .filter(SentimentLog.sentiment_label != 'IRRELEVANT').statement
 
 # Masukkan ke Pandas DataFrame agar mudah diolah
 df = pd.read_sql(query, db.bind)
