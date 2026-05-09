@@ -3,16 +3,17 @@ Test script untuk AI Sentiment Analysis.
 Jalankan: python test_sentiment.py
 """
 
-from src.analysis.sentiment import get_analyzer
+from src.analysis.sentiment import TruthEngineAI
+
 
 def test_sentiment():
     print("=" * 60)
     print("🧠 TESTING AI SENTIMENT ANALYSIS")
     print("=" * 60)
-    
-    # Load model (ini akan download model pertama kali, ~400MB)
-    analyzer = get_analyzer()
-    
+
+    # Load model (ini bisa download model pertama kali dan butuh waktu)
+    analyzer = TruthEngineAI()
+
     # Test cases: berita finansial
     test_texts = [
         {
@@ -28,34 +29,25 @@ def test_sentiment():
             "text": "The central bank maintains interest rates at current levels. Analysts expect steady economic growth in the coming quarter."
         }
     ]
-    
+
     print("\n📊 ANALYZING TEST ARTICLES:\n")
-    
+
     for i, item in enumerate(test_texts, 1):
         print(f"\n{i}. {item['title']}")
         print("-" * 60)
-        
-        # Basic analysis
-        result = analyzer.analyze(item['text'])
-        
+
+        result = analyzer.analyze(item["text"], source_credibility=0.8)
+
         if result:
-            print(f"   Label: {result['label'].upper()}")
+            print(f"   Label: {result['sentiment_label']}")
             print(f"   Confidence: {result['confidence']:.2%}")
-            print(f"   Sentiment Score: {result['sentiment_score']:.3f}")
-        
-        # Analysis with integrity (Truth Engine)
-        result_integrity = analyzer.analyze_with_integrity(
-            item['text'],
-            source_credibility=0.8,  # Assume trusted source
-            noise_probability=0.1     # 10% noise
-        )
-        
-        if result_integrity:
-            print(f"   Integrity Score: {result_integrity['integrity_score']:.3f}")
-    
+            print(f"   Noise Probability: {result['noise_probability']:.2%}")
+            print(f"   Integrity Score: {result['integrity_score']:.3f}")
+
     print("\n" + "=" * 60)
     print("✅ AI SENTIMENT ANALYSIS TEST COMPLETE!")
     print("=" * 60)
+
 
 if __name__ == "__main__":
     test_sentiment()

@@ -11,7 +11,16 @@ echo -e "${BLUE}🛡️  Starting Senti-Quant Dashboard...${NC}"
 # Set PYTHONPATH ke root project
 export PYTHONPATH="$(pwd)"
 
+# Pakai virtual environment project kalau tersedia.
+if [ -f "venv/bin/activate" ]; then
+	source venv/bin/activate
+fi
+
 # Jalankan Streamlit
-streamlit run src/app/dashboard.py
+if [ -x "venv/bin/streamlit" ]; then
+	venv/bin/streamlit run src/app/dashboard.py
+else
+	streamlit run src/app/dashboard.py
+fi
 
 echo -e "${GREEN}✅ Dashboard stopped${NC}"

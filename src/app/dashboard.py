@@ -45,21 +45,21 @@ df = pd.read_sql(query, db.bind)
 # --- 4. SIDEBAR (Filter Interaktif) ---
 st.sidebar.image("https://img.icons8.com/color/96/000000/bullish.png", width=80)
 st.sidebar.title("⚙️ Control Panel")
-st.sidebar.markdown("Filter data sentimen pasar secara *real-time*.")
+st.sidebar.markdown("Filter market sentiment data in *real-time*.")
 
 # Filter Sumber Berita
-sumber_list = ["Semua"] + df['domain'].unique().tolist()
-sumber_pilihan = st.sidebar.selectbox("📰 Filter Sumber Berita:", sumber_list)
+sumber_list = ["All"] + df['domain'].unique().tolist()
+sumber_pilihan = st.sidebar.selectbox("📰 Filter News Sources:", sumber_list)
 
-if sumber_pilihan != "Semua":
+if sumber_pilihan != "All":
     df = df[df['domain'] == sumber_pilihan]
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Truth Engine V1.0**\n\nBerita dengan sentimen 'NEUTRAL' biasanya adalah berita faktual tanpa opini pasar.")
+st.sidebar.info("💡 **Truth Engine V1.0**\n\nArticles with 'NEUTRAL' sentiment are typically factual reports without market opinion.")
 
 # --- 5. HEADER DASHBOARD ---
 st.title("🛡️ Senti-Quant: AI Truth Engine")
-st.markdown("*Menyaring Kebisingan, Menemukan Kebenaran di Pasar Modal.*")
+st.markdown("*Filtering the Noise, Finding the Truth in Financial Markets.*")
 st.markdown("---")
 
 # --- 6. METRIK KPI (Key Performance Indicators) ---
@@ -71,10 +71,10 @@ noise_count = len(df[df['sentiment_label'] == 'NEUTRAL'])
 
 # Menampilkan 4 Kolom Metrik
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("📊 Total Berita Diproses", total_berita)
-col2.metric("🚀 Sentimen Bullish (Positif)", bullish_count)
-col3.metric("🩸 Sentimen Bearish (Negatif)", bearish_count)
-col4.metric("🌫️ Noise (Netral/Faktual)", noise_count)
+col1.metric("📊 Total Articles Processed", total_berita)
+col2.metric("🚀 Bullish Sentiment (Positive)", bullish_count)
+col3.metric("🩸 Bearish Sentiment (Negative)", bearish_count)
+col4.metric("🌫️ Noise (Neutral/Factual)", noise_count)
 
 st.markdown("---")
 
@@ -82,7 +82,7 @@ st.markdown("---")
 col_chart1, col_chart2 = st.columns(2)
 
 with col_chart1:
-    st.subheader("🍩 Distribusi Sentimen Pasar")
+    st.subheader("🍩 Market Sentiment Distribution")
     if total_berita > 0:
         # Membuat Donut Chart Interaktif dengan Plotly
         fig_donut = px.pie(
@@ -99,10 +99,10 @@ with col_chart1:
         fig_donut.update_traces(textposition='inside', textinfo='percent+label')
         st.plotly_chart(fig_donut, use_container_width=True)
     else:
-        st.warning("Belum ada data sentimen.")
+        st.warning("No sentiment data available yet.")
 
 with col_chart2:
-    st.subheader("📈 Skor Integritas (Truth Score)")
+    st.subheader("📈 Integrity Score (Truth Score)")
     if total_berita > 0:
         # Histogram skor integritas
         fig_hist = px.histogram(
@@ -113,20 +113,20 @@ with col_chart2:
         )
         st.plotly_chart(fig_hist, use_container_width=True)
     else:
-        st.warning("Belum ada data integritas.")
+        st.warning("No integrity data available yet.")
 
 # --- 8. TABEL DATA LANGSUNG (Truth Feed) ---
 st.subheader("🔍 Live Truth Feed (Data Log)")
 
 # Merapikan tabel agar enak dilihat
 df_tabel = df[['title', 'domain', 'sentiment_label', 'integrity_score', 'url']]
-df_tabel.columns = ['Judul Artikel', 'Sumber', 'Sentimen', 'Skor Integritas', 'URL']
+df_tabel.columns = ['Article Title', 'Source', 'Sentiment', 'Integrity Score', 'URL']
 
 # Tampilkan sebagai tabel interaktif di Streamlit
 st.dataframe(
     df_tabel.style.applymap(
         lambda x: 'color: green;' if x == 'POSITIVE' else ('color: red;' if x == 'NEGATIVE' else ''),
-        subset=['Sentimen']
+        subset=['Sentiment']
     ),
     use_container_width=True,
     height=300
