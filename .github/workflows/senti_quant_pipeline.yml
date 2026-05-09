@@ -22,6 +22,8 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PYTHONUNBUFFERED: '1'
       PYTHONPATH: ${{ github.workspace }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
     steps:
       - name: Checkout repository
@@ -48,3 +50,23 @@ jobs:
 
       - name: Run Senti-Quant pipeline
         run: python -m src.main
+
+      - name: Send Telegram notification on failure
+        if: failure()
+        shell: bash
+        run: |
+          ESCAPED_MESSAGE=$(cat <<'EOF' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/%0A/g'
+          ❌ *Senti-Quant Pipeline Failed*
+
+          *Repository:* ${{ github.repository }}
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* ${{ github.sha }}
+          *Run ID:* ${{ github.run_id }}
+
+          Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${ESCAPED_MESSAGE}" \
+            -d "parse_mode=Markdown" || true
