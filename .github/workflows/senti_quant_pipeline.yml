@@ -49,7 +49,41 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Senti-Quant pipeline
-        run: python -m src.main
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m src.main 2>&1 | tee pipeline.log
+
+      - name: Send Telegram notification on success
+        if: success()
+        shell: bash
+        run: |
+          CLEANUP_LINE=$(grep '^PIPELINE_CLEANUP_METRICS=' pipeline.log | tail -n 1 || true)
+          CLEANUP_JSON="{}"
+
+          if [ -n "$CLEANUP_LINE" ]; then
+            CLEANUP_JSON=${CLEANUP_LINE#PIPELINE_CLEANUP_METRICS=}
+          fi
+
+          ESCAPED_MESSAGE=$(cat <<EOF | sed ':a;N;$!ba;s/\n/%0A/g'
+✅ <b>Senti-Quant Pipeline Sukses</b>
+
+<b>Repository:</b> ${{ github.repository }}
+<b>Branch:</b> ${{ github.ref_name }}
+<b>Commit:</b> ${{ github.sha }}
+<b>Run ID:</b> ${{ github.run_id }}
+
+<b>Cleanup Metrics:</b>
+<pre>${CLEANUP_JSON}</pre>
+
+Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+EOF
+          )
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${ESCAPED_MESSAGE}" \
+            -d "parse_mode=HTML" || true
 
       - name: Send Telegram notification on failure
         if: failure()

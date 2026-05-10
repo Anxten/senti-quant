@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 from src.data.database import init_db, get_db
@@ -91,6 +92,10 @@ async def run_pipeline():
 
         cleanup_result = cleanup_old_data(db, retention_days=retention_days)
         logger.info("🧾 Ringkasan cleanup: %s", cleanup_result)
+        logger.info(
+            "PIPELINE_CLEANUP_METRICS=%s",
+            json.dumps(cleanup_result, ensure_ascii=False),
+        )
 
         logger.info("🏁 Pipeline Selesai Secara Keseluruhan.")
         
