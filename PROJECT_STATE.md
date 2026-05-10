@@ -7,14 +7,15 @@ Senti-Quant (The Truth Engine) adalah sebuah platform financial sentiment analys
 Output akhir dari sistem ini adalah sebuah Dashboard Live yang menampilkan metrik sentimen (Bullish/Bearish/Neutral) dan Integrity Score dari setiap artikel, memberikan keunggulan analitik tingkat institusi kepada investor biasa untuk menghindari jebakan pump-and-dump atau FOMO.
 
 ## 2. Tech Stack & Environment
-Sistem ini berjalan secara optimal di atas sistem operasi Linux Fedora, dengan teknologi utama berikut:
+Sistem ini berjalan secara optimal di atas sistem operasi Linux Fedora, dengan teknologi utama berikut (sejak commit 37, infrastruktur telah dimigrasikan ke cloud-native):
 * **Bahasa Pemrograman:** Python (berjalan di dalam venv).
 * **Data Ingestion (Scraping):** aiohttp & asyncio (untuk asynchronous request), BeautifulSoup (dengan parser lxml khusus mode "xml" untuk RSS).
 * **AI & NLP Engine:** transformers (Hugging Face Pipeline), torch.
 * **Pre-trained Model:** mdhugol/indonesia-bert-sentiment-classification.
 * **Database:** Neon PostgreSQL (Cloud/Serverless) diakses menggunakan SQLAlchemy (ORM).
 * **Frontend/UI:** Streamlit, pandas, plotly (untuk visualisasi Donut Chart dan Histogram interaktif).
-* **Automation:** Linux Cron Job.
+* **Automation:** GitHub Actions (Cloud CI/CD dengan schedule cron di cloud, menggantikan laptop-dependent cron lokal).
+* **Notifications:** Telegram Bot API (real-time alerts untuk pipeline success/failure).
 
 ## 3. Directory Structure
 ```text
@@ -63,11 +64,46 @@ Struktur relasional yang saat ini berjalan di Neon PostgreSQL (direpresentasikan
 * ✅ **Relevance Filter (Gatekeeper):** Filter otomatis yang mengecap IRRELEVANT pada berita non-finansial sebelum diproses NLP untuk menjaga validitas data.
 * ✅ **Hybrid AI Truth Engine:** Kombinasi Dictionary Heuristics dan NLP Machine Learning.
 * ✅ **Clickbait/Noise Detector:** Algoritma pemotongan skor integritas otomatis berdasarkan tanda baca dan kapitalisasi berlebih.
-* ✅ **Full Automation:** Berjalan otonom via Linux Cron Job tanpa intervensi manual.
+* ✅ **Full Cloud Automation:** Berjalan otonom via GitHub Actions (tidak bergantung laptop - always-on compute).
+* ✅ **24/7 Reliability:** Data collection berjalan setiap hari Senin-Jumat pukul 08:00 & 16:00 UTC (15:00 & 23:00 WIB).
+* ✅ **Data Retention Policy:** Auto-cleanup 30 hari untuk menjaga database quota Neon (0.5 GB) tetap stabil.
+* ✅ **Telegram Notifications:** Real-time alerts untuk pipeline success (dengan cleanup metrics) dan failure (dengan GitHub Actions link).
 * ✅ **Enterprise UI:** Dashboard berkelas SaaS dengan metrik Bloomberg-style, Donut Chart, dan tabel log data real-time.
 * ✅ **UI Truth Filter (Commit 31):** Modifikasi pada `dashboard.py` yang berhasil menyaring artikel berlabel IRRELEVANT di level database, memastikan metrik dan grafik hanya menampilkan sentimen pasar murni.
+* ✅ **Pandas 2.0+ Compatibility (Commit 36):** Fixed deprecated `DataFrame.style.applymap()` → `DataFrame.style.map()` untuk kompatibilitas dengan Streamlit Cloud.
 
 ## 7. Known Issues & Next Development Steps
+## 8. Recent Infrastructure Improvements (Commits 33-37)
+### Commit 33: Data Retention Policy
+- Implementasi `cleanup_old_data()` di `src/data/crud.py` yang menghapus artikel & sentiment logs lebih tua dari retention_days.
+- Terintegrasi ke pipeline `src/main.py` dengan JSON metrics emission: `PIPELINE_CLEANUP_METRICS={"retention_days": 30, "deleted_sentiment_logs": N, "deleted_articles": M}`.
+- Database quota protection: Mencegah database quota (0.5 GB Neon free tier) terlampaui dengan auto-cleanup setiap pipeline run.
+- **Manual Cleanup:** User dapat menjalankan `python manual_cleanup.py [days]` kapan saja untuk cleanup manual.
+
+### Commit 34-35: GitHub Actions Workflow + Telegram Integration
+- Migrasi dari local cron ke GitHub Actions (`.github/workflows/senti_quant_pipeline.yml`).
+- Schedule: `cron: '0 1,9 * * 1-5'` (UTC) = Senin-Jumat pukul 08:00 & 16:00 WIB (sesuai jam operasional bursa).
+- **Failure Notifications:** If pipeline error → Telegram alert dengan GitHub Actions run link (Markdown format).
+- **Success Notifications:** If pipeline success → Telegram alert dengan cleanup metrics (HTML format untuk JSON pretty-print).
+- Secrets: `DATABASE_URL`, `HF_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` ✅ terverifikasi berfungsi.
+
+### Commit 36-37: Dashboard Fixes & Manual Cleanup Scripts
+- Fixed Pandas 2.0+ incompatibility: `.applymap()` → `.map()` di `src/app/dashboard.py` line 127.
+- Added `test_cleanup.py` & `manual_cleanup.py` untuk verifikasi dan manual execution retention cleanup.
+- Verifikasi: Cleanup logic berfungsi sempurna (243 artikel lama dari Maret 2026 berhasil dihapus saat test).
+
+## 9. Current Status (10 Mei 2026)
+**System Health:** 🟢 Fully Operational (Cloud Infrastructure Complete)
+- ✅ GitHub Actions workflow ready (active setiap hari kerja 08:00 & 16:00 WIB)
+- ✅ Neon PostgreSQL stable (30 MB / 0.5 GB = 6% utilized after cleanup)
+- ✅ Telegram notifications working (tested with success/failure alerts)
+- ⚠️ Dashboard accessible di https://allan-senti-quant.streamlit.app/ (applymap fix deployed)
+- 📊 Data: Cleaned up 243 old articles from March (retention policy verified working)
+
+**Note:** Today is Sunday (not in schedule), so no pipeline execution today. Next run: Monday 11 May 2026 at 08:00 UTC.
+
+## 10. Known Issues & Next Development Steps
 * 🐛 **Known Issue (Gatekeeper Terlalu Agresif):** Relevance filter di `sentiment.py` masih buta terhadap istilah makroekonomi (minyak, perang, suku bunga) dan ticker emiten (misal: PGEO). Akibatnya, berita fundamental penting rentan terbuang menjadi IRRELEVANT karena tidak memenuhi kuota 2 kata kunci spesifik.
-* 🚀 **Next Step (Gatekeeper V2):** Memperbaiki logic `_is_financial_news()` dengan menambahkan kamus makroekonomi dan deteksi *regex* untuk ticker emiten agar filter lebih akurat (Commit 32).
+* 🚀 **Next Step (Gatekeeper V2):** Memperbaiki logic `_is_financial_news()` dengan menambahkan kamus makroekonomi dan deteksi *regex* untuk ticker emiten agar filter lebih akurat.
+* 🚀 **Future (Monetization Layer):** API endpoints untuk data consumption, premium Telegram bot features, atau subscription model untuk enterprise clients.
 * 🚀 **Next Step (Data Expansion):** Menambahkan sumber RSS baru di `main.py` di luar CNBC (misalnya Kontan, Bisnis.com, atau Investor.id) untuk memperkaya analisis sentimen.
