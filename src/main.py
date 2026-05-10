@@ -1,8 +1,9 @@
 import asyncio
 import logging
+import os
 from src.data.database import init_db, get_db
 from src.data.scraper import AsyncNewsScraper, fetch_rss_links
-from src.data.crud import save_article, get_unprocessed_articles, save_sentiment_log
+from src.data.crud import save_article, get_unprocessed_articles, save_sentiment_log, cleanup_old_data
 from src.analysis.sentiment import TruthEngineAI
 
 # Setup Logging Profesional
@@ -80,6 +81,17 @@ async def run_pipeline():
                 # Simpan ke Database
                 save_sentiment_log(db, article.id, analysis_result)
                 
+        # --- FASE 3: RETENTION CLEANUP ---
+        retention_days_raw = os.getenv("RETENTION_DAYS", "30")
+        try:
+            retention_days = int(retention_days_raw)
+        except ValueError:
+            logger.warning("⚠️ RETENTION_DAYS tidak valid (%s). Fallback ke 30 hari.", retention_days_raw)
+            retention_days = 30
+
+        cleanup_result = cleanup_old_data(db, retention_days=retention_days)
+        logger.info("🧾 Ringkasan cleanup: %s", cleanup_result)
+
         logger.info("🏁 Pipeline Selesai Secara Keseluruhan.")
         
     finally:

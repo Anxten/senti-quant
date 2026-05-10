@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from src.data.models import Article, NewsSource, SentimentLog
@@ -108,3 +110,59 @@ def get_unprocessed_articles(db: Session, limit: int = 10):
     subquery = db.query(SentimentLog.article_id)
     articles = db.query(Article).filter(Article.id.notin_(subquery)).limit(limit).all()
     return articles
+
+
+def cleanup_old_data(db: Session, retention_days: int = 30) -> dict:
+    """
+    Menghapus data lama untuk menjaga kapasitas database tetap stabil.
+
+    Strategi:
+    1. Hapus sentiment_logs yang terkait artikel lama
+    2. Hapus articles lama berdasarkan scraped_at
+
+    Return dict untuk logging observabilitas pipeline.
+    """
+    try:
+        if retention_days <= 0:
+            retention_days = 30
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+        old_article_ids = db.query(Article.id).filter(Article.scraped_at < cutoff)
+
+        deleted_logs = (
+            db.query(SentimentLog)
+            .filter(SentimentLog.article_id.in_(old_article_ids))
+            .delete(synchronize_session=False)
+        )
+
+        deleted_articles = (
+            db.query(Article)
+            .filter(Article.scraped_at < cutoff)
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+
+        logger.info(
+            "🧹 Retention cleanup selesai | Hari: %s | SentimentLog terhapus: %s | Article terhapus: %s",
+            retention_days,
+            deleted_logs,
+            deleted_articles,
+        )
+
+        return {
+            "retention_days": retention_days,
+            "deleted_sentiment_logs": deleted_logs,
+            "deleted_articles": deleted_articles,
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Gagal menjalankan retention cleanup: {e}")
+        return {
+            "retention_days": retention_days,
+            "deleted_sentiment_logs": 0,
+            "deleted_articles": 0,
+            "error": str(e),
+        }
