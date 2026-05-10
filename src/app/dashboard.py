@@ -123,9 +123,18 @@ df_tabel = df[['title', 'domain', 'sentiment_label', 'integrity_score', 'url']]
 df_tabel.columns = ['Article Title', 'Source', 'Sentiment', 'Integrity Score', 'URL']
 
 # Tampilkan sebagai tabel interaktif di Streamlit
+def color_sentiment(val):
+    """Warna kolom Sentiment berdasarkan label."""
+    if val == 'POSITIVE':
+        return 'color: green;'
+    elif val == 'NEGATIVE':
+        return 'color: red;'
+    else:
+        return ''
+
 st.dataframe(
-    df_tabel.style.applymap(
-        lambda x: 'color: green;' if x == 'POSITIVE' else ('color: red;' if x == 'NEGATIVE' else ''),
+    df_tabel.style.map(
+        color_sentiment,
         subset=['Sentiment']
     ),
     use_container_width=True,
