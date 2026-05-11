@@ -133,7 +133,9 @@ class TruthEngineAI:
         normalized_text = self._normalize_text(text)
         negative_signals = [
             'laba turun', 'rugi naik', 'penurunan laba', 'pemangkasan dividen',
-            'kinerja memburuk', 'ditekan', 'tekanan jual', 'gagal bayar'
+            'kinerja memburuk', 'ditekan', 'tekanan jual', 'gagal bayar',
+            'kerugian', 'kerugian kuartal', 'phk', 'phk massal', 'pemutusan hubungan kerja',
+            'pemutusan kerja', 'pengurangan karyawan', 'pemangkasan', 'anjlok'
         ]
         return any(phrase in normalized_text for phrase in negative_signals)
 
