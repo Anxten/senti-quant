@@ -34,7 +34,7 @@ async def run_pipeline():
     ]
     
     # 3. Sedot semua link terbaru (Bisa dapat 50 - 100 link dalam 2 detik)
-    target_urls = await fetch_rss_links(rss_sources)
+    target_urls = fetch_rss_links(rss_sources)
     logger.info(f"🎯 Total target artikel hari ini: {len(target_urls)} artikel.")
     
     # 4. Extract (Scraping)

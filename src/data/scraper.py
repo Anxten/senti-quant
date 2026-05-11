@@ -1,6 +1,8 @@
 import asyncio
 import aiohttp
 import logging
+import cloudscraper
+import time
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Optional, List, Dict
@@ -103,48 +105,41 @@ class AsyncNewsScraper:
         return None
 
 # --- FUNGSI RSS PARSER -------------------------------------------------------
-async def fetch_rss_links(rss_urls: list) -> list:
-    """Menyedot ratusan link artikel terbaru secara legal dari RSS Feed."""
+def fetch_rss_links(rss_urls: list) -> list:
+    """Menyedot ratusan link artikel terbaru dari RSS Feed, with Cloudflare bypass."""
     all_links = []
-    # Gunakan header mirip browser agar tidak diblokir oleh WAF/Cloudflare
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
-        'Referer': 'https://www.google.com/',
-        'Connection': 'keep-alive'
-    }
-
-    async with aiohttp.ClientSession(headers=headers) as session:
-        for url in rss_urls:
-            try:
-                print(f"📡 Mengambil RSS Feed dari: {url}...")
-                # Be polite: acak sedikit jitter antara 0.2-0.8 detik
-                await asyncio.sleep(random.uniform(0.2, 0.8))
-
-                # Pasang header eksplisit juga pada request untuk memastikan override
-                async with session.get(url, timeout=15, headers=headers, allow_redirects=True) as response:
-                    if response.status == 200:
-                        xml_data = await response.text()
-
-                        # PERBAIKAN: Gunakan "xml" murni untuk menghindari tag terpotong
-                        soup = BeautifulSoup(xml_data, "xml") 
-
-                        items = soup.find_all("item")
-
-                        count = 0
-                        for item in items:
-                            link = item.find("link")
-                            if link and link.text:
-                                all_links.append(link.text.strip())
-                                count += 1
-
-                        print(f"✅ Berhasil mendapatkan {count} link dari {url}")
-                    else:
-                        print(f"❌ Gagal akses {url} (Status: {response.status})")
-            except Exception as e:
-                print(f"⚠️ Error saat membaca RSS {url}: {e}")
-
+    
+    # Gunakan cloudscraper untuk bypass Cloudflare challenges
+    scraper = cloudscraper.create_scraper()
+    
+    for url in rss_urls:
+        try:
+            print(f"📡 Mengambil RSS Feed dari: {url}...")
+            time.sleep(random.uniform(0.3, 0.8))  # Sopan santun ke server
+            
+            response = scraper.get(url, timeout=15)
+            
+            if response.status_code == 200:
+                xml_data = response.text
+                
+                # Gunakan "xml" parser untuk RSS/Atom feeds
+                soup = BeautifulSoup(xml_data, "xml")
+                
+                items = soup.find_all("item")
+                
+                count = 0
+                for item in items:
+                    link = item.find("link")
+                    if link and link.text:
+                        all_links.append(link.text.strip())
+                        count += 1
+                        
+                print(f"✅ Berhasil mendapatkan {count} link dari {url}")
+            else:
+                print(f"❌ Gagal akses {url} (Status: {response.status_code})")
+        except Exception as e:
+            print(f"⚠️ Error saat membaca RSS {url}: {e}")
+            
     return list(set(all_links))
 
 
