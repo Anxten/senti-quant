@@ -66,18 +66,18 @@ jobs:
           fi
 
           ESCAPED_MESSAGE=$(cat <<EOF | sed ':a;N;$!ba;s/\n/%0A/g'
-✅ <b>Senti-Quant Pipeline Sukses</b>
+            ✅ <b>Senti-Quant Pipeline Sukses</b>
 
-<b>Repository:</b> ${{ github.repository }}
-<b>Branch:</b> ${{ github.ref_name }}
-<b>Commit:</b> ${{ github.sha }}
-<b>Run ID:</b> ${{ github.run_id }}
+            <b>Repository:</b> ${{ github.repository }}
+            <b>Branch:</b> ${{ github.ref_name }}
+            <b>Commit:</b> ${{ github.sha }}
+            <b>Run ID:</b> ${{ github.run_id }}
 
-<b>Cleanup Metrics:</b>
-<pre>${CLEANUP_JSON}</pre>
+            <b>Cleanup Metrics:</b>
+            <pre>${CLEANUP_JSON}</pre>
 
-Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-EOF
+            Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            EOF
           )
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
