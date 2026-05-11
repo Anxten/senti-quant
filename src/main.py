@@ -37,6 +37,13 @@ async def run_pipeline():
     target_urls = fetch_rss_links(rss_sources)
     logger.info(f"🎯 Total target artikel hari ini: {len(target_urls)} artikel.")
     
+    # Handle case where RSS fetch fails (e.g., blocked by Cloudflare in GitHub Actions)
+    if len(target_urls) == 0:
+        logger.warning("⚠️ PERINGATAN: Tidak ada link yang diambil dari RSS feeds!")
+        logger.warning("Penyebab: RSS feeds mungkin diblokir (Cloudflare/WAF), redirect, atau tidak tersedia.")
+        logger.info("Pipeline akan dilewati untuk run ini. Akan dicoba ulang pada run berikutnya.")
+        return  # Exit gracefully instead of failing
+    
     # 4. Extract (Scraping)
     scraped_results = []
     async with AsyncNewsScraper() as scraper:

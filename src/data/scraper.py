@@ -106,8 +106,10 @@ class AsyncNewsScraper:
 
 # --- FUNGSI RSS PARSER -------------------------------------------------------
 def fetch_rss_links(rss_urls: list) -> list:
-    """Menyedot ratusan link artikel terbaru dari RSS Feed, with Cloudflare bypass."""
+    """Menyedot ratusan link artikel terbaru dari RSS Feed, with error handling & Cloudflare bypass."""
     all_links = []
+    successful_feeds = 0
+    failed_feeds = []
     
     # Gunakan cloudscraper untuk bypass Cloudflare challenges
     scraper = cloudscraper.create_scraper()
@@ -135,12 +137,21 @@ def fetch_rss_links(rss_urls: list) -> list:
                         count += 1
                         
                 print(f"✅ Berhasil mendapatkan {count} link dari {url}")
+                successful_feeds += 1
             else:
-                print(f"❌ Gagal akses {url} (Status: {response.status_code})")
+                print(f"⚠️ HTTP {response.status_code} dari {url} — Skipping...")
+                failed_feeds.append((url, response.status_code))
         except Exception as e:
-            print(f"⚠️ Error saat membaca RSS {url}: {e}")
-            
-    return list(set(all_links))
+            print(f"⚠️ Error saat membaca RSS {url}: {str(e)[:80]}")
+            failed_feeds.append((url, str(e)[:50]))
+    
+    unique_links = list(set(all_links))
+    print(f"\n📊 RSS Summary: {successful_feeds} feeds OK, {len(failed_feeds)} feeds failed, {len(unique_links)} total unique links")
+    
+    if not unique_links:
+        print("⚠️ WARNING: No RSS links fetched! Pipeline may have limited data.")
+    
+    return unique_links
 
 
 # --- BAGIAN TESTING (Hanya jalan jika file ini dieksekusi langsung) ---
