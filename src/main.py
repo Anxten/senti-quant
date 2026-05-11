@@ -30,7 +30,6 @@ async def run_pipeline():
     # 2. Daftar "Mata Air" Berita Finansial (RSS Feeds)
     rss_sources = [
         "https://www.cnbcindonesia.com/market/rss",
-        "https://www.cnbcindonesia.com/investment/rss",
         # Kamu bisa tambah RSS Kontan, Bisnis.com, dll di sini nanti
     ]
     
