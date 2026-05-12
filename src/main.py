@@ -28,9 +28,9 @@ async def run_pipeline():
     init_db()
     
     # 2. Daftar "Mata Air" Berita Finansial (RSS Feeds)
+    # Menggunakan Google News aggregator untuk menghindari WAF/Cloudflare blocking
     rss_sources = [
-        "https://www.cnbcindonesia.com/market/rss",
-        # Kamu bisa tambah RSS Kontan, Bisnis.com, dll di sini nanti
+        "https://news.google.com/rss/search?q=saham+OR+bursa+efek+OR+IHSG+OR+emiten+when:1d&hl=id&gl=ID&ceid=ID:id",
     ]
     
     # 3. Sedot semua link terbaru (Bisa dapat 50 - 100 link dalam 2 detik)
