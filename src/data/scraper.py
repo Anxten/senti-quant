@@ -189,16 +189,28 @@ def parse_rss_items_directly(rss_urls: list) -> list:
                         link_el = item.find("link")
                         description_el = item.find("description")
                         pubdate_el = item.find("pubDate")
+                        source_el = item.find("source")
                         
                         title = title_el.text.strip() if title_el else "No title"
                         link = link_el.text.strip() if link_el else None
-                        description = description_el.text.strip() if description_el else ""
+                        description_raw = description_el.text.strip() if description_el else ""
+                        # Google News description biasanya berisi HTML (<a>, <font>, dll), jadi dibersihkan dulu.
+                        description = BeautifulSoup(description_raw, "html.parser").get_text(" ", strip=True)
                         pub_date = pubdate_el.text.strip() if pubdate_el else datetime.now().isoformat()
                         
                         # Extract domain from link
                         domain = "unknown"
-                        if link:
-                            # Try to extract domain from various URL formats
+                        source_url = source_el.get("url", "").strip() if source_el else ""
+                        source_name = source_el.text.strip() if source_el and source_el.text else ""
+
+                        if source_url:
+                            source_domain_match = re.search(r'(?:https?://)?(?:www\.)?([^/]+)', source_url)
+                            if source_domain_match:
+                                domain = source_domain_match.group(1)
+                        elif source_name:
+                            domain = source_name
+                        elif link:
+                            # Fallback domain dari link item
                             domain_match = re.search(r'(?:https?://)?(?:www\.)?([^/]+)', link)
                             if domain_match:
                                 domain = domain_match.group(1)

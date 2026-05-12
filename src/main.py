@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from src.data.database import init_db, get_db
-from src.data.scraper import AsyncNewsScraper, fetch_rss_links, parse_rss_items_directly
+from src.data.scraper import parse_rss_items_directly
 from src.data.crud import save_article, get_unprocessed_articles, save_sentiment_log, cleanup_old_data
 from src.analysis.sentiment import TruthEngineAI
 
@@ -36,15 +36,17 @@ async def run_pipeline():
     # 3. Extract artikel langsung dari RSS items (tidak perlu scraping HTML lagi)
     # Google News RSS sudah berisi title, description, link, pubDate
     logger.info("📰 Mengekstrak artikel dari RSS feed items...")
-    scraped_results = parse_rss_items_directly(rss_sources)
-    logger.info(f"✅ Berhasil mengekstrak {len(scraped_results)} artikel dari RSS.")
+    articles = parse_rss_items_directly(rss_sources)
+    logger.info(f"✅ Berhasil mengekstrak {len(articles)} artikel dari RSS.")
     
     # Handle case where RSS fetch fails (e.g., blocked by Cloudflare in GitHub Actions)
-    if len(scraped_results) == 0:
+    if len(articles) == 0:
         logger.warning("⚠️ PERINGATAN: Tidak ada artikel yang diektrak dari RSS feeds!")
         logger.warning("Penyebab: RSS feeds mungkin diblokir (Cloudflare/WAF), redirect, atau tidak tersedia.")
         logger.info("Pipeline akan dilewati untuk run ini. Akan dicoba ulang pada run berikutnya.")
         return  # Exit gracefully instead of failing
+
+    logger.info(f"Sample extracted content: {articles[0].content[:100]}")
 
     # 3. Load (Saving to DB)
     db_gen = get_db()
@@ -52,7 +54,7 @@ async def run_pipeline():
     
     try:
         # Simpan artikel
-        for item in scraped_results:
+        for item in articles:
             save_article(db, item)
             
         # --- FASE 2: AI SENTIMENT ANALYSIS ---
