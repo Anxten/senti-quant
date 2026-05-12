@@ -3,6 +3,7 @@ import aiohttp
 import logging
 import cloudscraper
 import time
+import re
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Optional, List, Dict
@@ -35,6 +36,61 @@ class AsyncNewsScraper:
         self.session: Optional[aiohttp.ClientSession] = None
         # INI LAMPUNYA: Hanya izinkan maksimal 5 request jalan bersamaan
         self.semaphore = asyncio.Semaphore(max_concurrent_requests)
+
+    def _resolve_google_news_redirect(self, url: str) -> str:
+        """Extract actual article URL from Google News article page."""
+        if 'news.google.com' not in url:
+            return url  # Bukan Google News URL, langsung return
+        
+        try:
+            import requests
+            # Fetch the Google News article page
+            response = requests.get(
+                url,
+                timeout=8,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"Google News page returned {response.status_code}")
+                return url
+            
+            html = response.text
+            
+            # Look for redirect in various formats that Google News uses
+            # Method 1: Check for meta redirect
+            import re
+            meta_redirect = re.search(r'<meta[^>]+?http-equiv=["\']refresh["\'][^>]*?content=["\']0;url=([^"\']+)', html, re.I)
+            if meta_redirect:
+                redirect_url = meta_redirect.group(1)
+                if 'news.google.com' not in redirect_url:
+                    logger.info(f"✓ Resolved (meta redirect): {redirect_url[:70]}...")
+                    return redirect_url
+            
+            # Method 2: Check for onclick/href in article container
+            # Google News article usually has a link with href to actual article
+            article_link = re.search(r'href=["\']([^"\']*?(?:cnbc|kontan|liputan|kompas|detik|bisnis|antara|finance)[^"\']*?)["\']', html, re.I)
+            if article_link:
+                link = article_link.group(1)
+                if 'news.google.com' not in link and link.startswith('http'):
+                    logger.info(f"✓ Resolved (article href): {link[:70]}...")
+                    return link
+            
+            # Method 3: Check response history for redirect
+            if response.history:
+                for resp in response.history:
+                    if resp.status_code in [301, 302, 303, 307, 308]:
+                        location = resp.headers.get('location', '')
+                        if location and 'news.google.com' not in location:
+                            logger.info(f"✓ Resolved (response history): {location[:70]}...")
+                            return location
+            
+            logger.warning(f"Could not extract article URL from Google News page")
+            return url
+            
+        except Exception as e:
+            logger.warning(f"Error resolving Google News URL: {str(e)[:60]}")
+            return url
 
     async def __aenter__(self):
         """Context Manager entry"""
@@ -98,13 +154,81 @@ class AsyncNewsScraper:
             return None
 
     async def scrape_url(self, url: str) -> Optional[ScrapedData]:
-        """Fungsi utama: Fetch -> Parse"""
-        html = await self.fetch_html(url)
+        """Fungsi utama: Resolve redirect (jika Google News) -> Fetch -> Parse"""
+        # Jika dari Google News, resolve redirect ke artikel asli terlebih dahulu
+        actual_url = self._resolve_google_news_redirect(url)
+        
+        html = await self.fetch_html(actual_url)
         if html:
-            return self.parse_html(html, url)
+            return self.parse_html(html, actual_url)
         return None
 
 # --- FUNGSI RSS PARSER -------------------------------------------------------
+def parse_rss_items_directly(rss_urls: list) -> list:
+    """Extract article data directly from RSS items without scraping HTML."""
+    articles = []
+    
+    scraper = cloudscraper.create_scraper()
+    
+    for url in rss_urls:
+        try:
+            print(f"📡 Mengambil RSS Feed dari: {url}...")
+            time.sleep(random.uniform(0.3, 0.8))
+            
+            response = scraper.get(url, timeout=15)
+            
+            if response.status_code == 200:
+                xml_data = response.text
+                soup = BeautifulSoup(xml_data, "xml")
+                items = soup.find_all("item")
+                
+                count = 0
+                for item in items:
+                    try:
+                        title_el = item.find("title")
+                        link_el = item.find("link")
+                        description_el = item.find("description")
+                        pubdate_el = item.find("pubDate")
+                        
+                        title = title_el.text.strip() if title_el else "No title"
+                        link = link_el.text.strip() if link_el else None
+                        description = description_el.text.strip() if description_el else ""
+                        pub_date = pubdate_el.text.strip() if pubdate_el else datetime.now().isoformat()
+                        
+                        # Extract domain from link
+                        domain = "unknown"
+                        if link:
+                            # Try to extract domain from various URL formats
+                            domain_match = re.search(r'(?:https?://)?(?:www\.)?([^/]+)', link)
+                            if domain_match:
+                                domain = domain_match.group(1)
+                        
+                        # Create ScrapedData from RSS item
+                        article = ScrapedData(
+                            url=link or url,
+                            title=title,
+                            content=description or title,  # Use description if available, else title
+                            source_domain=domain,
+                            published_at=pub_date
+                        )
+                        
+                        articles.append(article)
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"Gagal parse item: {str(e)[:50]}")
+                        continue
+                
+                print(f"✅ Berhasil mengekstrak {count} artikel dari {url}")
+            else:
+                print(f"⚠️ HTTP {response.status_code} dari {url}")
+                
+        except Exception as e:
+            print(f"⚠️ Error saat membaca RSS {url}: {str(e)[:80]}")
+    
+    print(f"\n📊 Total: {len(articles)} artikel diektrak langsung dari RSS items")
+    return articles
+
+
 def fetch_rss_links(rss_urls: list) -> list:
     """Menyedot ratusan link artikel terbaru dari RSS Feed, with error handling & Cloudflare bypass."""
     all_links = []

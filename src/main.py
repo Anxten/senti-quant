@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from src.data.database import init_db, get_db
-from src.data.scraper import AsyncNewsScraper, fetch_rss_links
+from src.data.scraper import AsyncNewsScraper, fetch_rss_links, parse_rss_items_directly
 from src.data.crud import save_article, get_unprocessed_articles, save_sentiment_log, cleanup_old_data
 from src.analysis.sentiment import TruthEngineAI
 
@@ -33,27 +33,18 @@ async def run_pipeline():
         "https://news.google.com/rss/search?q=saham+OR+bursa+efek+OR+IHSG+OR+emiten+when:1d&hl=id&gl=ID&ceid=ID:id",
     ]
     
-    # 3. Sedot semua link terbaru (Bisa dapat 50 - 100 link dalam 2 detik)
-    target_urls = fetch_rss_links(rss_sources)
-    logger.info(f"🎯 Total target artikel hari ini: {len(target_urls)} artikel.")
+    # 3. Extract artikel langsung dari RSS items (tidak perlu scraping HTML lagi)
+    # Google News RSS sudah berisi title, description, link, pubDate
+    logger.info("📰 Mengekstrak artikel dari RSS feed items...")
+    scraped_results = parse_rss_items_directly(rss_sources)
+    logger.info(f"✅ Berhasil mengekstrak {len(scraped_results)} artikel dari RSS.")
     
     # Handle case where RSS fetch fails (e.g., blocked by Cloudflare in GitHub Actions)
-    if len(target_urls) == 0:
-        logger.warning("⚠️ PERINGATAN: Tidak ada link yang diambil dari RSS feeds!")
+    if len(scraped_results) == 0:
+        logger.warning("⚠️ PERINGATAN: Tidak ada artikel yang diektrak dari RSS feeds!")
         logger.warning("Penyebab: RSS feeds mungkin diblokir (Cloudflare/WAF), redirect, atau tidak tersedia.")
         logger.info("Pipeline akan dilewati untuk run ini. Akan dicoba ulang pada run berikutnya.")
         return  # Exit gracefully instead of failing
-    
-    # 4. Extract (Scraping)
-    scraped_results = []
-    async with AsyncNewsScraper() as scraper:
-        tasks = [scraper.scrape_url(url) for url in target_urls]
-        results = await asyncio.gather(*tasks)  # Tarik semua berita secara paralel!
-        
-        # Saring hasil yang tidak kosong (sukses di-scrape)
-        scraped_results = [r for r in results if r is not None]
-
-    logger.info(f"✅ Berhasil menarik {len(scraped_results)} artikel dari internet.")
 
     # 3. Load (Saving to DB)
     db_gen = get_db()
