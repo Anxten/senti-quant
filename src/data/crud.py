@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
+import hashlib
 from src.data.models import Article, NewsSource, SentimentLog
 from src.data.scraper import ScrapedData
 from src.config.credibility import get_credibility
@@ -40,8 +42,40 @@ def save_article(db: Session, data: ScrapedData) -> bool:
     try:
         # 1. Pastikan Sumber Berita ada
         source = get_or_create_source(db, data.source_domain)
-        
-        # 2. Cek apakah URL sudah pernah discrape (Idempotency)
+        # 2a. Dedup Level-2: Normalisasi judul (lowercase, hapus non-alphanum) dan cek kesamaan
+        try:
+            # Normalisasi judul di aplikasi
+            def _normalize_title(t: str) -> str:
+                import re
+                s = (t or "").lower()
+                s = re.sub(r'[^a-z0-9]', '', s)
+                return s
+
+            normalized = _normalize_title(data.title)
+            title_hash = hashlib.md5(normalized.encode('utf-8')).hexdigest()
+
+            # Coba normalisasi di sisi DB (Postgres regexp_replace) — jika tidak tersedia, fallback ke Python
+            try:
+                db_norm_expr = func.lower(func.regexp_replace(Article.title, '[^a-z0-9]', '', 'g'))
+                existing_by_title = db.query(Article).filter(db_norm_expr == normalized).first()
+                if existing_by_title:
+                    logger.info(f"♻️ Skip duplikat judul (norm-md5={title_hash}): {data.title[:60]}...")
+                    return False
+            except Exception:
+                # Fallback: lakukan normalisasi di sisi aplikasi dan bandingkan dengan semua judul di DB
+                candidates = db.query(Article).all()
+                for cand in candidates:
+                    try:
+                        cand_norm = _normalize_title(cand.title)
+                        if cand_norm and cand_norm == normalized:
+                            logger.info(f"♻️ Skip duplikat judul (norm-md5={title_hash}): {data.title[:60]}...")
+                            return False
+                    except Exception:
+                        continue
+        except Exception:
+            # Jika ada error tak terduga saat proses normalisasi/cek, fallback ke pengecekan URL
+            logger.debug("⚠️ Normalized title check mengalami error; fallback ke pengecekan URL saja.")
+        # 2b. Cek apakah URL sudah pernah discrape (Idempotency)
         existing_article = db.query(Article).filter(Article.url == data.url).first()
         if existing_article:
             logger.info(f"♻️ Skip duplikat: {data.title[:30]}...")
