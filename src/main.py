@@ -6,6 +6,7 @@ from src.data.database import init_db, get_db
 from src.data.scraper import parse_rss_items_directly
 from src.data.crud import save_article, get_unprocessed_articles, save_sentiment_log, cleanup_old_data
 from src.analysis.sentiment import TruthEngineAI
+from src.bot.summary_broadcaster import broadcast_summary
 
 # Setup Logging Profesional
 logging.basicConfig(
@@ -96,10 +97,15 @@ async def run_pipeline():
             json.dumps(cleanup_result, ensure_ascii=False),
         )
 
+        # --- FASE 4: TELEGRAM SUMMARY BROADCAST ---
+        logger.info("📢 Memulai Fase Broadcast: Mengirim ringkasan ke Telegram...")
+        broadcast_summary(db)
+
         logger.info("🏁 Pipeline Selesai Secara Keseluruhan.")
         
     finally:
-        db.close()  # Tutup koneksi agar server tidak berat
+        if db:
+            db.close()  # Tutup koneksi agar server tidak berat
 
 if __name__ == "__main__":
     # Menjalankan fungsi async utama
