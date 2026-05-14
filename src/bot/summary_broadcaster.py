@@ -7,12 +7,21 @@ ke group Telegram menggunakan Telegram Bot API.
 import logging
 import requests
 import os
+from html import escape
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from src.data.models import Article, SentimentLog, NewsSource
 
 logger = logging.getLogger(__name__)
+
+
+def _format_sentiment_display(sentiment_label: str, integrity: float) -> str:
+    if sentiment_label == "POSITIVE":
+        return f"🟢 POSITIF ({integrity:+.2f})"
+    if sentiment_label == "NEGATIVE":
+        return f"🔴 NEGATIF ({integrity:+.2f})"
+    return f"⚪ {sentiment_label} ({integrity:+.2f})"
 
 
 def broadcast_summary(db: Session) -> bool:
@@ -69,21 +78,23 @@ def broadcast_summary(db: Session) -> bool:
         for idx, (article, sentiment, source) in enumerate(top_articles, 1):
             # Tentukan emoji dan warna berdasarkan sentiment
             emoji = "📈" if sentiment.sentiment_label == "POSITIVE" else "📉"
-            sentiment_text = sentiment.sentiment_label
             
             # Format integrity score dengan 2 desimal
             integrity = sentiment.integrity_score
-            integrity_display = f"{integrity:+.3f}" if integrity != 0 else "0.000"
+            sentiment_display = _format_sentiment_display(sentiment.sentiment_label, integrity)
             
             # Potong judul jika terlalu panjang
             title = article.title[:60]
             if len(article.title) > 60:
                 title += "…"
+
+            escaped_title = escape(title)
+            escaped_url = escape(article.url, quote=True)
             
-            # Buat line dengan format: emoji + title + source + score
+            # Buat line dengan format: bullet + clickable title + source + sentimen eksplisit
             line = (
-                f"{emoji} <b>{title}</b>\n"
-                f"   Sumber: {source.domain} | Integritas: {integrity_display}"
+                f"🔹 <a href=\"{escaped_url}\">{escaped_title}</a>\n"
+                f"🏢 Sumber: {escape(source.domain)} | {sentiment_display}"
             )
             message_lines.append(line)
             message_lines.append("")
