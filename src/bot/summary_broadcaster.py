@@ -9,6 +9,7 @@ import requests
 import os
 from html import escape
 from datetime import datetime, timedelta, timezone
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from src.data.models import Article, SentimentLog, NewsSource
@@ -52,6 +53,31 @@ def broadcast_summary(db: Session) -> bool:
             )
             .all()
         )
+
+        # Aggregate counts for market pulse (group by sentiment_label)
+        agg = (
+            db.query(SentimentLog.sentiment_label, func.count(func.distinct(SentimentLog.article_id)))
+            .join(Article, SentimentLog.article_id == Article.id)
+            .filter(Article.scraped_at >= cutoff_time)
+            .group_by(SentimentLog.sentiment_label)
+            .all()
+        )
+
+        # normalize aggregation into counters
+        positive_count = 0
+        negative_count = 0
+        noise_count = 0
+        for label, cnt in agg:
+            lab = (label or "").upper()
+            if lab == "POSITIVE":
+                positive_count = int(cnt)
+            elif lab == "NEGATIVE":
+                negative_count = int(cnt)
+            elif lab in ("NEUTRAL", "IRRELEVANT"):
+                noise_count += int(cnt)
+            else:
+                # any other labels count as noise
+                noise_count += int(cnt)
         
         if not articles_with_sentiment:
             logger.info("ℹ️ Tidak ada berita POSITIVE/NEGATIVE dalam 12 jam terakhir. Skip broadcast.")
@@ -72,6 +98,7 @@ def broadcast_summary(db: Session) -> bool:
         # 5. Format pesan Markdown/HTML untuk Telegram
         message_lines = [
             "📰 <b>Senti-Quant Market Summary (12 jam)</b>",
+            f"📊 <b>Nadi Pasar:</b> 🟢 {positive_count} Positif | 🔴 {negative_count} Negatif | ⚪ {noise_count} Noise",
             "",
         ]
         
