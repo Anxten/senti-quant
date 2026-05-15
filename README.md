@@ -5,7 +5,7 @@ colorFrom: indigo
 colorTo: purple
 sdk: streamlit
 sdk_version: 1.31.0
-app_file: src/app.py
+app_file: src/app/dashboard.py
 pinned: false
 license: mit
 ---
@@ -17,28 +17,29 @@ license: mit
 ![Database](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)
 
-**Senti-Quant** is a next-generation financial analysis platform that bridges **Natural Language Processing (NLP)** with **Quantitative Analysis**. Unlike traditional tools that just read sentiment, Senti-Quant acts as a "Truth Engine" to filter out market noise, bot activities, and information pollution.
+**Senti-Quant** is a financial sentiment platform that combines **Natural Language Processing (NLP)** with a lightweight truth-filtering pipeline. Unlike generic sentiment tools, Senti-Quant is designed to suppress market noise, highlight meaningful news, and produce an executive summary that is easier to act on.
 
-> *"In 2026, the problem isn't lack of information. It's Information Asymmetry and Data Pollution."*
+> *"In 2026, the problem is not a lack of information. It is information asymmetry and data pollution."*
 
 ## 🔗 Live Demo
 
-**🚀 Aplikasi Senti-Quant sudah Live!** Kamu bisa mengakses dashboard interaktifnya di sini:  
+**Live Demo:** The dashboard is available here:  
 👉 **[allan-senti-quant.streamlit.app](https://allan-senti-quant.streamlit.app/)**
 
 
 **Features:**
-- Real-time sentiment analysis with Indonesia-BERT
-- Interactive dashboard with Plotly visualizations
+- Real-time financial sentiment analysis with Indonesia-BERT
+- Interactive Streamlit dashboard with Plotly charts
 - Noise detection and integrity scoring
-- PostgreSQL data persistence
+- PostgreSQL persistence on Neon
+- Telegram executive summaries for the top 5 market-relevant articles
 
-## 🚀 Key Features (The "Truth Engine")
-* **Sentiment De-noising:** Automatically filters out social media bots, spam, and "pump-and-dump" attempts before calculating sentiment scores.
-* **Integrity Scoring:** Assigns a credibility rating to every news source based on historical accuracy and domain authority.
-* **Quantitative Synergy:** Correlates real-time sentiment spikes with price volatility to detect anomalies.
-* **Hybrid Data Acquisition:** Asynchronous scraping engine capable of harvesting data from trusted news portals and social streams.
-* **Zero-Cost Architecture:** Built entirely on open-source technologies (PostgreSQL, Hugging Face, Python).
+## 🚀 Key Features
+* **Sentiment de-noising:** Filters bot-like, spammy, and pump-and-dump style content before scoring.
+* **Integrity scoring:** Rates articles using sentiment, source credibility, and noise probability.
+* **Hybrid data acquisition:** Uses RSS ingestion and direct parsing for stable article collection.
+* **Telegram-first delivery:** Sends a concise 12-hour executive summary to Telegram with clickable article links.
+* **Dashboard support:** Keeps a Streamlit dashboard for human inspection and historical review.
 
 ## 🧠 The Logic Behind the Innovation
 Senti-Quant goes beyond simple polarity detection. It applies a weighted integrity logic:
@@ -59,13 +60,13 @@ $$
 
 ## 🚀 Quick Start
 
-### 1. Run Data Pipeline
+### 1. Run the Data Pipeline
 ```bash
-# Scrape news, analyze sentiment, save to database
+# Ingest RSS news, analyze sentiment, save to database, and broadcast Telegram summary
 python -m src.main
 ```
 
-### 2. Launch Dashboard
+### 2. Launch the Dashboard
 ```bash
 # Option 1: Using launcher script (recommended)
 ./run_dashboard.sh
@@ -74,26 +75,36 @@ python -m src.main
 PYTHONPATH=$(pwd) streamlit run src/app/dashboard.py
 ```
 
-Dashboard will open at `http://localhost:8501`
+The dashboard will open at `http://localhost:8501`
+
+### 3. Run the cleanup utility manually
+```bash
+# Dry-run first
+python scripts/cleanup_example_dot_com_articles.py
+
+# Confirm deletion if you really need to remove example.com dummy rows
+python scripts/cleanup_example_dot_com_articles.py --confirm
+```
 
 ## 🛠️ Tech Stack
-- **Core:** Python 3.10+, Asyncio
-- **Data Layer:** PostgreSQL, SQLAlchemy ORM, BeautifulSoup, aiohttp
-- **AI Engine:** Hugging Face Transformers (Indonesia-BERT)
+- **Core:** Python 3.10+, asyncio
+- **Data layer:** PostgreSQL, SQLAlchemy ORM, BeautifulSoup, aiohttp
+- **AI engine:** Hugging Face Transformers (Indonesia-BERT)
+- **Notifications:** Telegram Bot API
 - **Visualization:** Streamlit, Plotly
-- **Environment:** Fedora Linux | VS Code
+- **Environment:** Fedora Linux, VS Code, DigitalOcean VPS for production runtime
 
 ## 📦 Installation & Setup
 
-Follow these steps to set up the **Truth Engine** locally:
+Follow these steps to set up the project locally:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/Anxten/senti-quant.git](https://github.com/Anxten/senti-quant.git)
+git clone https://github.com/Anxten/senti-quant.git
 cd senti-quant
 ```
 
-### 2. Set Up Virtual Environment (Fedora/Linux)
+### 2. Set Up a Virtual Environment (Fedora/Linux)
 Always use a virtual environment to prevent system package conflicts.
 
 ```bash
@@ -107,8 +118,8 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Database Setup (Docker Recommended)
-Ensure you have a PostgreSQL instance running.
+### 4. Database Setup
+Ensure you have a PostgreSQL instance running or a valid Neon connection string in `.env`.
 
 ```bash
 # Example if using Docker
@@ -116,28 +127,34 @@ docker run --name senti-db -e POSTGRES_PASSWORD=secret -d -p 5432:5432 postgres
 ```
 
 ## 📊 Project Structure
-Designed with Clean Architecture principles for scalability.
+Designed with clean architecture principles for scalability.
 
 ```
 senti-quant/
 ├── src/
-│   ├── data/           # Database models & Async scrapers
-│   ├── analysis/       # AI Models & Sentiment Logic
-│   ├── app/            # Streamlit Dashboard
-│   ├── main.py         # ETL Pipeline Orchestrator
+│   ├── data/           # Database models, CRUD, and RSS parsing
+│   ├── analysis/       # AI models & sentiment logic
+│   ├── app/            # Streamlit dashboard
+│   ├── bot/            # Telegram summary broadcaster
+│   ├── main.py         # ETL pipeline orchestrator
 │   └── __init__.py
-├── test_db_connection.py  # Database tests
-├── test_sentiment.py      # AI tests
-├── run_dashboard.sh       # Dashboard launcher
-├── requirements.txt       # Project dependencies
-├── .env                   # Configuration
-└── README.md              # Documentation
+├── scripts/              # Utility scripts
+├── tests/                # Test helpers
+├── run_dashboard.sh      # Dashboard launcher
+├── requirements.txt      # Project dependencies
+├── .env                  # Configuration
+└── README.md             # Documentation
 ```
 
 ## 🎯 Use Cases
-- **Retail Investors (Gen-Z):** Verifying if a trending stock is organic or a bot-driven hype.
-- **Market Analysts:** Filtering "noise" from daily news feeds to focus on high-impact stories.
-- **Academic Research:** Studying the correlation between fake news spread and market volatility.
+- **Retail investors:** Checking whether a trending stock is driven by organic news or hype.
+- **Market analysts:** Filtering noise from daily news feeds to focus on high-impact stories.
+- **Academic research:** Studying the relationship between news quality and market movement.
+
+## 🚀 Production Notes
+The production pipeline currently runs on a DigitalOcean VPS in Singapore. The schedule is set to execute at **08:00 WIB** and **16:00 WIB** on weekdays, with the Telegram summary as the primary delivery channel.
+
+The workflow is not dependent on GitHub Actions for runtime execution.
 
 ## 📝 License
 This project is open-source and available under the MIT License.
@@ -146,4 +163,4 @@ This project is open-source and available under the MIT License.
 
 **Developed by Allan Bendatu**
 *Informatics Student*
-*Building the "Truth Engine" for the Capital Markets.*
+*Building the Truth Engine for the capital markets.*

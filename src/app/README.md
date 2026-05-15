@@ -1,47 +1,43 @@
-# 🛡️ Senti-Quant Dashboard
+# Senti-Quant Dashboard
 
-Web-based visualization dashboard untuk Truth Engine.
+This folder contains the Streamlit dashboard for the Senti-Quant Truth Engine.
 
-## 🚀 Quick Start
+## Quick Start
 
-### Opsi 1: Menggunakan Launcher Script (Recommended)
+### Option 1: Use the launcher script
 ```bash
-# Dari root project
 ./run_dashboard.sh
 ```
 
-### Opsi 2: Manual Command
+### Option 2: Run Streamlit manually
 ```bash
-# Dari root project
 PYTHONPATH=$(pwd) streamlit run src/app/dashboard.py
 ```
 
-Dashboard akan terbuka di browser pada `http://localhost:8501`
+The dashboard will open at `http://localhost:8501`.
 
-### ⚠️ Important Note
-Jangan jalankan `streamlit run src/app/dashboard.py` langsung tanpa set PYTHONPATH, karena akan error import.
+## Features
 
-## 📊 Features
+- Real-time market sentiment metrics
+- Interactive Plotly charts
+- Live data feed with sentiment coloring
+- Automatic filtering of `IRRELEVANT` articles from the main dashboard metrics
+- Cached database access for better responsiveness
 
-- **Real-time Metrics**: Total berita, organik vs noise, sentimen dominan
-- **Interactive Charts**: Bar chart & pie chart dengan Plotly
-- **Live Data Feed**: Tabel interaktif dengan filter sentimen
-- **Auto-refresh**: Data di-cache 60 detik untuk performa optimal
+## Dashboard Layout
 
-## 🎨 Screenshots
+The dashboard currently shows:
+1. Summary KPI cards for processed articles and sentiment counts
+2. Sentiment distribution chart
+3. Integrity score histogram
+4. Live truth feed table
 
-Dashboard menampilkan:
-1. Metrik utama (4 cards)
-2. Distribusi sentimen (bar chart)
-3. Rasio integritas (donut chart)
-4. Live truth feed (filterable table)
+## Configuration
 
-## 🔧 Configuration
+The dashboard reads from the same PostgreSQL database used by the main pipeline.
 
-Dashboard otomatis membaca dari PostgreSQL database yang sama dengan pipeline utama.
+## Notes
 
-## 📝 Notes
-
-- Dashboard menggunakan caching untuk mengurangi load database
-- Data di-refresh otomatis setiap 60 detik
-- Semua chart interaktif (zoom, pan, hover)
+- The database connection is lazy and only opens when the dashboard actually queries data.
+- Data refresh behavior is handled by Streamlit caching and the dashboard query layer.
+- The dashboard is a supporting view; Telegram is now the primary executive delivery channel.
