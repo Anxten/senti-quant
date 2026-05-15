@@ -130,17 +130,30 @@ def broadcast_summary(db: Session) -> bool:
         ]
         
         # helper: extract 4-letter uppercase ticker-like tokens
-        def _extract_ticker(text: str) -> str | None:
-            if not text:
-                return None
-            # Search for $ASII or ASII patterns (4 uppercase letters typical for IHSG tickers)
-            m = re.search(r"\$?\b([A-Z]{4})\b", text)
-            if m:
-                cand = m.group(1)
-                # simple blacklist to avoid accidental common words (very small list)
-                blacklist = {"THIS", "HTML", "HTTP", "NEWS"}
-                if cand not in blacklist:
-                    return cand
+        def _extract_ticker(title: str, content: str | None = None) -> str | None:
+            """
+            Extract valid stock ticker (4 uppercase letters).
+            - Search in title first, then in content
+            - Exclude index symbols (IHSG, LQ45) and common words
+            - Return first match or None
+            """
+            # Blacklist: indices, common words, and abbreviations
+            blacklist = {"THIS", "HTML", "HTTP", "NEWS", "IHSG", "LQ45", "WHEN", "THAT", "WITH"}
+            
+            # Search title first (higher priority)
+            if title:
+                for m in re.finditer(r"\$?\b([A-Z]{4})\b", title):
+                    cand = m.group(1)
+                    if cand not in blacklist:
+                        return cand
+            
+            # If no ticker in title, search content
+            if content:
+                for m in re.finditer(r"\$?\b([A-Z]{4})\b", content):
+                    cand = m.group(1)
+                    if cand not in blacklist:
+                        return cand
+            
             return None
 
         for idx, (article, sentiment, source) in enumerate(top_articles, 1):
@@ -153,7 +166,8 @@ def broadcast_summary(db: Session) -> bool:
 
             # Do not truncate title anymore; show full title. Prepend detected ticker or macro label.
             raw_title = article.title or ""
-            ticker = _extract_ticker(raw_title + " " + (article.content or ""))
+            raw_content = article.content or ""
+            ticker = _extract_ticker(raw_title, raw_content)
             if ticker:
                 title_prefix = f"[$%s] " % ticker
             else:
