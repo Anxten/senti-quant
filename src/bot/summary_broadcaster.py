@@ -138,18 +138,18 @@ def broadcast_summary(db: Session) -> bool:
             - Return first match or None
             """
             # Blacklist: indices, common words, and abbreviations
-            blacklist = {"THIS", "HTML", "HTTP", "NEWS", "IHSG", "LQ45", "WHEN", "THAT", "WITH"}
+            blacklist = {"THIS", "HTML", "HTTP", "NEWS", "IHSG", "LQ45", "MSCI", "WHEN", "THAT", "WITH"}
             
             # Search title first (higher priority)
             if title:
-                for m in re.finditer(r"\$?\b([A-Z]{4})\b", title):
+                for m in re.finditer(r"\b([A-Z]{4})\b", title):
                     cand = m.group(1)
                     if cand not in blacklist:
                         return cand
             
             # If no ticker in title, search content
             if content:
-                for m in re.finditer(r"\$?\b([A-Z]{4})\b", content):
+                for m in re.finditer(r"\b([A-Z]{4})\b", content):
                     cand = m.group(1)
                     if cand not in blacklist:
                         return cand
