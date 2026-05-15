@@ -8,13 +8,16 @@ import logging
 import requests
 import os
 from html import escape
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
+import holidays
 from src.data.models import Article, SentimentLog, NewsSource
 
 logger = logging.getLogger(__name__)
+
+_INDONESIA_HOLIDAYS = holidays.ID()
 
 
 def _format_sentiment_display(sentiment_label: str, integrity: float) -> str:
@@ -23,6 +26,12 @@ def _format_sentiment_display(sentiment_label: str, integrity: float) -> str:
     if sentiment_label == "NEGATIVE":
         return f"🔴 NEGATIF ({integrity:+.2f})"
     return f"⚪ {sentiment_label} ({integrity:+.2f})"
+
+
+def _should_mute_telegram_broadcast(today: date | None = None) -> bool:
+    """Return True when Telegram broadcast should be muted."""
+    current_day = today or date.today()
+    return current_day.weekday() >= 5 or current_day in _INDONESIA_HOLIDAYS
 
 
 def broadcast_summary(db: Session) -> bool:
@@ -158,6 +167,10 @@ def _send_telegram_message(message: str) -> bool:
         True jika berhasil, False jika gagal
     """
     try:
+        if _should_mute_telegram_broadcast():
+            logger.info("Hari libur terdeteksi, menahan broadcast Telegram.")
+            return False
+
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         chat_id = os.getenv("TELEGRAM_CHAT_ID")
         
