@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 import hashlib
+from thefuzz import fuzz
 from src.data.models import Article, NewsSource, SentimentLog
 from src.data.scraper import ScrapedData
 from src.config.credibility import get_credibility
@@ -66,9 +67,10 @@ def save_article(db: Session, data: ScrapedData) -> bool:
                 candidates = db.query(Article).all()
                 for cand in candidates:
                     try:
-                        cand_norm = _normalize_title(cand.title)
-                        if cand_norm and cand_norm == normalized:
-                            logger.info(f"♻️ Skip duplikat judul (norm-md5={title_hash}): {data.title[:60]}...")
+                        # Use fuzzy matching to detect syndicated / very similar articles
+                        score = fuzz.token_set_ratio(cand.title or "", data.title or "")
+                        if score >= 85:
+                            logger.info(f"♻️ Skip duplikat fuzzy match ({score}%): {data.title[:80]}...")
                             return False
                     except Exception:
                         continue

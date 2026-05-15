@@ -7,6 +7,7 @@ ke group Telegram menggunakan Telegram Bot API.
 import logging
 import requests
 import os
+import re
 from html import escape
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func
@@ -21,11 +22,28 @@ _INDONESIA_HOLIDAYS = holidays.ID()
 
 
 def _format_sentiment_display(sentiment_label: str, integrity: float) -> str:
-    if sentiment_label == "POSITIVE":
-        return f"🟢 POSITIF ({integrity:+.2f})"
-    if sentiment_label == "NEGATIVE":
-        return f"🔴 NEGATIF ({integrity:+.2f})"
-    return f"⚪ {sentiment_label} ({integrity:+.2f})"
+    """
+    Map raw integrity score + sentiment label to a retail-friendly text label.
+
+    Rules (retail-focused):
+    - POSITIVE with high integrity -> [STRONG POSITIVE]
+    - POSITIVE otherwise -> [POSITIVE]
+    - NEGATIVE with very low integrity -> [STRONG NEGATIVE]
+    - NEGATIVE moderately -> [NEGATIVE]
+    - NEGATIVE mild -> [MILD NEGATIVE]
+    """
+    lab = (sentiment_label or "").upper()
+    if lab == "POSITIVE":
+        if integrity is not None and integrity >= 0.6:
+            return "[STRONG POSITIVE]"
+        return "[POSITIVE]"
+    if lab == "NEGATIVE":
+        if integrity is not None and integrity <= -0.6:
+            return "[STRONG NEGATIVE]"
+        if integrity is not None and integrity <= -0.15:
+            return "[NEGATIVE]"
+        return "[MILD NEGATIVE]"
+    return f"[{lab}]"
 
 
 def _should_mute_telegram_broadcast(today: date | None = None) -> bool:
@@ -111,6 +129,20 @@ def broadcast_summary(db: Session) -> bool:
             "",
         ]
         
+        # helper: extract 4-letter uppercase ticker-like tokens
+        def _extract_ticker(text: str) -> str | None:
+            if not text:
+                return None
+            # Search for $ASII or ASII patterns (4 uppercase letters typical for IHSG tickers)
+            m = re.search(r"\$?\b([A-Z]{4})\b", text)
+            if m:
+                cand = m.group(1)
+                # simple blacklist to avoid accidental common words (very small list)
+                blacklist = {"THIS", "HTML", "HTTP", "NEWS"}
+                if cand not in blacklist:
+                    return cand
+            return None
+
         for idx, (article, sentiment, source) in enumerate(top_articles, 1):
             # Tentukan emoji dan warna berdasarkan sentiment
             emoji = "📈" if sentiment.sentiment_label == "POSITIVE" else "📉"
@@ -118,13 +150,17 @@ def broadcast_summary(db: Session) -> bool:
             # Format integrity score dengan 2 desimal
             integrity = sentiment.integrity_score
             sentiment_display = _format_sentiment_display(sentiment.sentiment_label, integrity)
-            
-            # Potong judul jika terlalu panjang
-            title = article.title[:60]
-            if len(article.title) > 60:
-                title += "…"
 
-            escaped_title = escape(title)
+            # Do not truncate title anymore; show full title. Prepend detected ticker or macro label.
+            raw_title = article.title or ""
+            ticker = _extract_ticker(raw_title + " " + (article.content or ""))
+            if ticker:
+                title_prefix = f"[$%s] " % ticker
+            else:
+                title_prefix = "[IHSG / MAKRO] "
+
+            full_title = f"{title_prefix}{raw_title}"
+            escaped_title = escape(full_title)
             escaped_url = escape(article.url, quote=True)
             
             # Buat line dengan format: bullet + clickable title + source + sentimen eksplisit
@@ -137,7 +173,9 @@ def broadcast_summary(db: Session) -> bool:
         
         # 6. Tambah footer
         message_lines.append("---")
-        message_lines.append(f"⏰ Update: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        # Show timestamp in WIB (UTC+7)
+        WIB = timezone(timedelta(hours=7))
+        message_lines.append(f"⏰ Update: {datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')} WIB")
         
         full_message = "\n".join(message_lines)
         
