@@ -10,6 +10,7 @@ import os
 import re
 from html import escape
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
@@ -48,7 +49,7 @@ def _format_sentiment_display(sentiment_label: str, integrity: float) -> str:
 
 def _should_mute_telegram_broadcast(today: date | None = None) -> bool:
     """Return True when Telegram broadcast should be muted."""
-    current_day = today or date.today()
+    current_day = today or datetime.now(ZoneInfo("Asia/Jakarta")).date()
     return current_day.weekday() >= 5 or current_day in _INDONESIA_HOLIDAYS
 
 
