@@ -16,10 +16,37 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 import holidays
 from src.data.models import Article, SentimentLog, NewsSource
+from src.utils.emiten_mapping import get_ticker_from_emiten_name
 
 logger = logging.getLogger(__name__)
 
 _INDONESIA_HOLIDAYS = holidays.ID()
+
+
+def _clean_title(title: str) -> str:
+    """
+    Remove redundant portal names from article title.
+    Examples: " - kontan.co.id", " | CNBC Indonesia", " - Bisnis.com"
+    
+    Args:
+        title: Raw article title
+        
+    Returns:
+        Cleaned title without portal suffix
+    """
+    if not title:
+        return title
+    
+    # Common separators used by Indonesian news portals
+    separators = [" - ", " | ", " • ", " –", " — "]
+    
+    for sep in separators:
+        if sep in title:
+            # Split and take only the first part (before portal name)
+            parts = title.split(sep)
+            title = parts[0].strip()
+    
+    return title
 
 
 def _format_sentiment_display(sentiment_label: str, integrity: float) -> str:
@@ -130,17 +157,33 @@ def broadcast_summary(db: Session) -> bool:
             "",
         ]
         
-        # helper: extract 4-letter uppercase ticker-like tokens
+        # helper: extract 4-letter uppercase ticker-like tokens with heuristic matching
         def _extract_ticker(title: str, content: str | None = None) -> str | None:
             """
-            Extract valid stock ticker (4 uppercase letters).
-            - Search in title first, then in content
-            - Exclude index symbols (IHSG, LQ45) and common words
-            - Return first match or None
+            Extract valid stock ticker using heuristic matching + regex.
+            
+            Strategy:
+            1. First try heuristic matching: search for company names in mapping dictionary
+            2. Fall back to regex: search for 4 uppercase letter patterns
+            3. Exclude index symbols (IHSG, LQ45, MSCI) and common words
+            
+            Returns first match or None
             """
             # Blacklist: indices, common words, and abbreviations
             blacklist = {"THIS", "HTML", "HTTP", "NEWS", "IHSG", "LQ45", "MSCI", "WHEN", "THAT", "WITH"}
             
+            # Strategy 1: Heuristic matching using dictionary
+            if title:
+                ticker_from_name = get_ticker_from_emiten_name(title)
+                if ticker_from_name and ticker_from_name not in blacklist:
+                    return ticker_from_name
+            
+            if content:
+                ticker_from_name = get_ticker_from_emiten_name(content)
+                if ticker_from_name and ticker_from_name not in blacklist:
+                    return ticker_from_name
+            
+            # Strategy 2: Regex matching for 4-letter uppercase patterns
             # Search title first (higher priority)
             if title:
                 for m in re.finditer(r"\b([A-Z]{4})\b", title):
@@ -165,16 +208,21 @@ def broadcast_summary(db: Session) -> bool:
             integrity = sentiment.integrity_score
             sentiment_display = _format_sentiment_display(sentiment.sentiment_label, integrity)
 
-            # Do not truncate title anymore; show full title. Prepend detected ticker or macro label.
+            # Do not truncate title anymore; show full title. Clean portal names and prepend ticker label.
             raw_title = article.title or ""
             raw_content = article.content or ""
+            
+            # Clean redundant portal names from title
+            clean_title = _clean_title(raw_title)
+            
+            # Extract ticker via heuristic + regex matching
             ticker = _extract_ticker(raw_title, raw_content)
             if ticker:
                 title_prefix = f"[$%s] " % ticker
             else:
                 title_prefix = "[IHSG / MAKRO] "
 
-            full_title = f"{title_prefix}{raw_title}"
+            full_title = f"{title_prefix}{clean_title}"
             escaped_title = escape(full_title)
             escaped_url = escape(article.url, quote=True)
             
