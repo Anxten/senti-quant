@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 import holidays
 from src.data.models import Article, SentimentLog, NewsSource
-from src.utils.emiten_mapping import get_ticker_from_emiten_name
+from src.analysis.emiten_mapping import get_ticker_from_text
 
 logger = logging.getLogger(__name__)
 
@@ -172,14 +172,14 @@ def broadcast_summary(db: Session) -> bool:
             # Blacklist: indices, common words, and abbreviations
             blacklist = {"THIS", "HTML", "HTTP", "NEWS", "IHSG", "LQ45", "MSCI", "WHEN", "THAT", "WITH"}
             
-            # Strategy 1: Heuristic matching using dictionary
+            # Strategy 1: Heuristic matching using external mapping (emiten_ihsg.json)
             if title:
-                ticker_from_name = get_ticker_from_emiten_name(title)
+                ticker_from_name = get_ticker_from_text(title)
                 if ticker_from_name and ticker_from_name not in blacklist:
                     return ticker_from_name
-            
+
             if content:
-                ticker_from_name = get_ticker_from_emiten_name(content)
+                ticker_from_name = get_ticker_from_text(content)
                 if ticker_from_name and ticker_from_name not in blacklist:
                     return ticker_from_name
             

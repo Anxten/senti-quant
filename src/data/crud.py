@@ -63,12 +63,15 @@ def save_article(db: Session, data: ScrapedData) -> bool:
                     logger.info(f"♻️ Skip duplikat judul (norm-md5={title_hash}): {data.title[:60]}...")
                     return False
             except Exception:
-                # Fallback: lakukan normalisasi di sisi aplikasi dan bandingkan dengan semua judul di DB
-                candidates = db.query(Article).all()
+                # Fallback: lakukan fuzzy matching terhadap artikel dalam window 24 jam terakhir
+                window_start = datetime.now(timezone.utc) - timedelta(hours=24)
+                candidates = db.query(Article).filter(Article.scraped_at >= window_start).all()
                 for cand in candidates:
                     try:
-                        # Use fuzzy matching to detect syndicated / very similar articles
-                        score = fuzz.token_set_ratio(cand.title or "", data.title or "")
+                        # Compare normalized titles using fuzz.ratio on stripped lowercase strings
+                        a = (cand.title or "").strip().lower()
+                        b = (data.title or "").strip().lower()
+                        score = fuzz.ratio(a, b)
                         if score >= 85:
                             logger.info(f"♻️ Skip duplikat fuzzy match ({score}%): {data.title[:80]}...")
                             return False
